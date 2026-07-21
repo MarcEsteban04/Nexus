@@ -1,11 +1,12 @@
 import { FormEvent, useState } from 'react';
-import { Heart, ListChecks, Wallet2, CheckCircle2, Plus, X } from 'lucide-react';
+import { Heart, ListChecks, Wallet2, CheckCircle2, Plus, Search, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatCard from '@/components/StatCard';
-import { inputClass, buttonPrimaryClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass } from '@/components/ui';
 import { useShoppingStore } from '@/store/shoppingStore';
-import { WishlistItem } from '@/types';
+import { ProductSearchResult, WishlistItem } from '@/types';
 import { formatCurrency } from '@/utils/money';
+import PriceSearchModal from './PriceSearchModal';
 
 const SWATCHES = [
   'from-accent-500 to-accent-300',
@@ -20,7 +21,7 @@ function swatchFor(id: string) {
   return SWATCHES[sum % SWATCHES.length];
 }
 
-function ItemCard({ item }: { item: WishlistItem }) {
+function ItemCard({ item, onFindPrice }: { item: WishlistItem; onFindPrice: (name: string) => void }) {
   const { togglePurchased, removeItem } = useShoppingStore();
   return (
     <div className="group overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 shadow-card transition-all hover:-translate-y-0.5 hover:border-surface-700">
@@ -30,12 +31,22 @@ function ItemCard({ item }: { item: WishlistItem }) {
             {item.store}
           </span>
         )}
-        <button
-          onClick={() => removeItem(item.id)}
-          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white opacity-0 transition-opacity hover:bg-black/60 group-hover:opacity-100"
-        >
-          <X size={13} />
-        </button>
+        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={() => onFindPrice(item.name)}
+            title="Find best price"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60"
+          >
+            <Search size={12} />
+          </button>
+          <button
+            onClick={() => removeItem(item.id)}
+            title="Remove"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60"
+          >
+            <X size={13} />
+          </button>
+        </div>
         <button
           onClick={() => togglePurchased(item.id)}
           className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur transition-colors hover:bg-black/60"
@@ -66,6 +77,8 @@ export default function Shopping() {
   const [price, setPrice] = useState('');
   const [store, setStore] = useState('');
   const [url, setUrl] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -75,6 +88,20 @@ export default function Shopping() {
     setPrice('');
     setStore('');
     setUrl('');
+  }
+
+  function openSearch(prefill: string) {
+    setSearchQuery(prefill);
+    setSearchOpen(true);
+  }
+
+  function addFromSearchResult(result: ProductSearchResult) {
+    addItem({
+      name: result.title,
+      price: result.price ?? undefined,
+      store: result.source,
+      url: result.link,
+    });
   }
 
   const active = items.filter((i) => !i.purchased);
@@ -89,6 +116,12 @@ export default function Shopping() {
           <StatCard label="Wishlist items" value={String(active.length)} icon={ListChecks} />
           <StatCard label="Estimated budget" value={formatCurrency(budgetTotal)} icon={Wallet2} />
           <StatCard label="Purchased" value={String(purchased.length)} icon={CheckCircle2} tone="positive" />
+        </div>
+
+        <div className="mb-4 flex justify-end">
+          <button onClick={() => openSearch('')} className={buttonSecondaryClass}>
+            <Search size={13} /> Find best price
+          </button>
         </div>
 
         <form
@@ -109,11 +142,18 @@ export default function Shopping() {
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {items.map((item) => (
-              <ItemCard key={item.id} item={item} />
+              <ItemCard key={item.id} item={item} onFindPrice={openSearch} />
             ))}
           </div>
         )}
       </div>
+
+      <PriceSearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        initialQuery={searchQuery}
+        onAddToWishlist={addFromSearchResult}
+      />
     </div>
   );
 }

@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('nexus', {
     ipcRenderer.on('window:maximized', listener);
     return () => ipcRenderer.removeListener('window:maximized', listener);
   },
+  searchProductPrices: (query: string) => ipcRenderer.invoke('shopping:search-prices', { query }),
 });

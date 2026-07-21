@@ -65,6 +65,17 @@ export interface Account {
   createdAt: string;
 }
 
+export interface ProductSearchResult {
+  title: string;
+  link: string;
+  source: string;
+  price: number | null;
+  priceDisplay: string | null;
+  rating: number | null;
+  reviews: number | null;
+  thumbnail: string | null;
+}
+
 export interface WishlistItem {
   id: string;
   name: string;

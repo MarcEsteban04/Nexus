@@ -1,3 +1,5 @@
+import { ProductSearchResult } from '@/types';
+
 export {};
 
 declare global {
@@ -9,6 +11,7 @@ declare global {
       close: () => void;
       isMaximized: () => Promise<boolean>;
       onMaximizedChange: (cb: (maximized: boolean) => void) => () => void;
+      searchProductPrices: (query: string) => Promise<{ results: ProductSearchResult[]; error: string | null }>;
     };
   }
 }
