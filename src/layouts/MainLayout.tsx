@@ -17,6 +17,7 @@ import {
   PiggyBank,
   Coins,
   Landmark,
+  ShieldCheck,
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import TitleBar from '@/components/TitleBar';
@@ -39,6 +40,7 @@ const NAV_ITEMS = [
       { to: '/money/exchange', label: 'Exchange Rate', icon: Coins },
     ],
   },
+  { to: '/vault', label: 'Password Vault', icon: ShieldCheck },
   { to: '/shopping', label: 'Shopping Hub', icon: ShoppingBag },
   { to: '/toolbox', label: 'Dev Toolbox', icon: Wrench },
 ];

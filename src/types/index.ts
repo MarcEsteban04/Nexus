@@ -76,6 +76,19 @@ export interface ProductSearchResult {
   thumbnail: string | null;
 }
 
+export interface PasswordEntry {
+  id: string;
+  title: string;
+  username: string;
+  password: string;
+  url: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ExtractedCredential = Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>;
+
 export interface WishlistItem {
   id: string;
   name: string;

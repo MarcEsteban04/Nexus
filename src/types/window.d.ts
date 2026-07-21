@@ -1,4 +1,4 @@
-import { ProductSearchResult } from '@/types';
+import { ExtractedCredential, ProductSearchResult } from '@/types';
 
 export {};
 
@@ -12,6 +12,7 @@ declare global {
       isMaximized: () => Promise<boolean>;
       onMaximizedChange: (cb: (maximized: boolean) => void) => () => void;
       searchProductPrices: (query: string) => Promise<{ results: ProductSearchResult[]; error: string | null }>;
+      parseImportText: (text: string) => Promise<{ results: ExtractedCredential[]; error: string | null }>;
     };
   }
 }

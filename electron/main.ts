@@ -17,6 +17,16 @@ interface PriceSearchResult {
   thumbnail: string | null;
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 45_000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function extractJsonArray(text: string): any[] {
   const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
   const start = cleaned.indexOf('[');
@@ -38,7 +48,7 @@ ipcMain.handle(
     if (!query.trim()) return { results: [], error: 'Enter a product to search for.' };
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,6 +96,73 @@ ipcMain.handle(
 
       return { results, error: null };
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { results: [], error: 'OpenAI request timed out after 45s. Check your connection and try again.' };
+      }
+      return { results: [], error: err instanceof Error ? err.message : 'Unknown error contacting OpenAI.' };
+    }
+  },
+);
+
+interface ExtractedCredential {
+  title: string;
+  username: string;
+  password: string;
+  url: string;
+  notes: string;
+}
+
+ipcMain.handle(
+  'vault:parse-import',
+  async (_event, { text }: { text: string }): Promise<{ results: ExtractedCredential[]; error: string | null }> => {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return { results: [], error: 'No OPENAI_API_KEY found in .env.local.' };
+    if (!text.trim()) return { results: [], error: 'Paste or select a file with your credentials first.' };
+
+    try {
+      const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a data-extraction assistant. The user will paste raw, messy personal notes containing website/app login credentials (e.g. copied from a notepad file), in any layout — plain lines, "site: user: pass", tables, mixed formats. Extract every distinct credential you can find. Return ONLY a raw JSON array (no markdown fences, no prose) of objects with keys: title (string, the site or app name), username (string, empty string "" if not present), password (string, empty string "" if not present), url (string, empty string "" if not present), notes (string, empty string "" — any leftover relevant context like security questions). Never invent data that is not in the text. If you find nothing, return [].',
+            },
+            { role: 'user', content: text },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        return { results: [], error: `OpenAI request failed (${res.status}): ${body.slice(0, 200)}` };
+      }
+
+      const data = await res.json();
+      const content: string = data?.choices?.[0]?.message?.content ?? '';
+      const items = extractJsonArray(content);
+
+      const results: ExtractedCredential[] = items
+        .filter((r) => r && typeof r.title === 'string')
+        .map((r) => ({
+          title: r.title,
+          username: typeof r.username === 'string' ? r.username : '',
+          password: typeof r.password === 'string' ? r.password : '',
+          url: typeof r.url === 'string' ? r.url : '',
+          notes: typeof r.notes === 'string' ? r.notes : '',
+        }));
+
+      return { results, error: null };
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { results: [], error: 'OpenAI request timed out after 45s. Check your connection and try again.' };
+      }
       return { results: [], error: err instanceof Error ? err.message : 'Unknown error contacting OpenAI.' };
     }
   },

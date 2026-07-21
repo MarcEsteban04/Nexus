@@ -13,6 +13,7 @@ import RecurringIncome from '@/pages/Money/sections/RecurringIncome';
 import ExchangeRate from '@/pages/Money/sections/ExchangeRate';
 import Shopping from '@/pages/Shopping/Shopping';
 import Toolbox from '@/pages/Toolbox/Toolbox';
+import Vault from '@/pages/Vault/Vault';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="income" element={<RecurringIncome />} />
           <Route path="exchange" element={<ExchangeRate />} />
         </Route>
+        <Route path="/vault" element={<Vault />} />
         <Route path="/shopping" element={<Shopping />} />
         <Route path="/toolbox" element={<Toolbox />} />
       </Route>
