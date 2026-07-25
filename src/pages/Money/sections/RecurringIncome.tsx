@@ -1,17 +1,87 @@
-import { FormEvent, useState } from 'react';
-import { Plus, Wallet, X } from 'lucide-react';
+import { ChangeEvent, FormEvent, useState } from 'react';
+import { Plus, Wallet, X, ImagePlus, CheckCircle2, ReceiptText } from 'lucide-react';
 import Card from '@/components/Card';
 import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import Select from '@/components/Select';
-import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
-import { formatCurrency, toMonthlyFromFrequency } from '@/utils/money';
-import { IncomeFrequency } from '@/types';
+import { useLinkedTransaction } from '@/hooks/useLinkedTransaction';
+import { formatCurrency, toMonthlyFromFrequency, advanceDate } from '@/utils/money';
+import { IncomeFrequency, RecurringIncome as RecurringIncomeType } from '@/types';
+
+function LogIncomeDrawer({ income, onClose }: { income: RecurringIncomeType | null; onClose: () => void }) {
+  const { accounts, lastAccountId, updateRecurringIncome } = useMoneyStore();
+  const createLinkedTransaction = useLinkedTransaction();
+  const [accountId, setAccountId] = useState(lastAccountId ?? '');
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+
+  function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setReceiptImage(String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function confirm() {
+    if (!income || !accountId) return;
+    createLinkedTransaction({
+      type: 'income',
+      amount: income.amount,
+      category: income.name,
+      note: `Recurring income — ${income.name}`,
+      date: new Date().toISOString().slice(0, 10),
+      accountId,
+      receiptImage,
+    });
+    updateRecurringIncome(income.id, { nextDate: advanceDate(income.nextDate, income.frequency) });
+    setReceiptImage(null);
+    onClose();
+  }
+
+  return (
+    <Drawer open={!!income} onClose={onClose} title="Log income">
+      {income && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-surface-800 p-3 text-[13px]">
+            <p className="font-medium text-surface-100">{income.name}</p>
+            <p className="mt-1 font-semibold text-emerald-400">+{formatCurrency(income.amount)}</p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-surface-400">
+              Deposit to account
+            </label>
+            {accounts.length === 0 ? (
+              <p className="text-[12px] text-surface-500">No accounts yet — add one in Accounts first.</p>
+            ) : (
+              <Select
+                value={accountId}
+                onChange={setAccountId}
+                options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${formatCurrency(a.balance)})` }))}
+                className="w-full"
+              />
+            )}
+          </div>
+          <label className={`flex w-full cursor-pointer items-center justify-center gap-2 ${buttonSecondaryClass}`}>
+            <ImagePlus size={13} /> {receiptImage ? 'Payslip attached' : 'Attach payslip (optional)'}
+            <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+          </label>
+          {receiptImage && <img src={receiptImage} alt="" className="h-24 w-full rounded-lg object-cover" />}
+          <button onClick={confirm} disabled={!accountId} className={`w-full ${buttonPrimaryClass}`}>
+            <CheckCircle2 size={14} /> Log this income
+          </button>
+        </div>
+      )}
+    </Drawer>
+  );
+}
 
 export default function RecurringIncome() {
   const { recurringIncomes, addRecurringIncome, removeRecurringIncome } = useMoneyStore();
   const [open, setOpen] = useState(false);
+  const [logTarget, setLogTarget] = useState<RecurringIncomeType | null>(null);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<IncomeFrequency>('monthly');
@@ -52,6 +122,9 @@ export default function RecurringIncome() {
               <span className="font-medium text-emerald-400">
                 +{formatCurrency(i.amount)} / {i.frequency}
               </span>
+              <button onClick={() => setLogTarget(i)} title="Log income" className="text-surface-500 transition-colors hover:text-accent-400">
+                <ReceiptText size={14} />
+              </button>
               <button onClick={() => removeRecurringIncome(i.id)} className={buttonGhostIconClass}>
                 <X size={14} />
               </button>
@@ -81,6 +154,8 @@ export default function RecurringIncome() {
           </button>
         </form>
       </Drawer>
+
+      <LogIncomeDrawer income={logTarget} onClose={() => setLogTarget(null)} />
     </Card>
   );
 }

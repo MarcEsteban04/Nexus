@@ -1,4 +1,4 @@
-import { DetectedShortcut, ExtractedCredential, ProductSearchResult } from '@/types';
+import { DetectedShortcut, ExtractedCredential, ProductSearchResult, ScannedReceipt } from '@/types';
 
 export {};
 
@@ -20,6 +20,7 @@ declare global {
         spawnPath: string | null,
       ) => Promise<{ error: string | null; tracked: boolean }>;
       onGameSessionEnded: (cb: (payload: { gameId: string; hours: number }) => void) => () => void;
+      scanReceiptImage: (imageDataUrl: string) => Promise<{ result: ScannedReceipt | null; error: string | null }>;
     };
   }
 }

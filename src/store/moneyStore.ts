@@ -11,15 +11,19 @@ interface MoneyState {
   savingsGoals: SavingsGoal[];
   recurringIncomes: RecurringIncome[];
   accounts: Account[];
+  lastAccountId: string | null;
 
-  addTransaction: (t: Omit<Transaction, 'id'>) => void;
+  addTransaction: (t: Omit<Transaction, 'id'>) => string;
   removeTransaction: (id: string) => void;
+  linkReceipt: (transactionId: string, receiptId: string) => void;
 
-  addBill: (b: Omit<Bill, 'id' | 'paid'>) => void;
-  toggleBillPaid: (id: string) => void;
+  addBill: (b: Omit<Bill, 'id' | 'paid' | 'paidTransactionId'>) => void;
+  markBillPaid: (id: string, transactionId: string) => void;
+  markBillUnpaid: (id: string) => void;
   removeBill: (id: string) => void;
 
   addSubscription: (s: Omit<Subscription, 'id'>) => void;
+  updateSubscription: (id: string, patch: Partial<Omit<Subscription, 'id'>>) => void;
   removeSubscription: (id: string) => void;
 
   addDebt: (d: Omit<Debt, 'id'>) => void;
@@ -31,6 +35,7 @@ interface MoneyState {
   removeSavingsGoal: (id: string) => void;
 
   addRecurringIncome: (i: Omit<RecurringIncome, 'id'>) => void;
+  updateRecurringIncome: (id: string, patch: Partial<Omit<RecurringIncome, 'id'>>) => void;
   removeRecurringIncome: (id: string) => void;
 
   addAccount: (a: Omit<Account, 'id' | 'createdAt'>) => void;
@@ -40,7 +45,7 @@ interface MoneyState {
 
 export const useMoneyStore = create<MoneyState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       transactions: [],
       bills: [],
       subscriptions: [],
@@ -48,22 +53,61 @@ export const useMoneyStore = create<MoneyState>()(
       savingsGoals: [],
       recurringIncomes: [],
       accounts: [],
+      lastAccountId: null,
 
-      addTransaction: (t) =>
-        set((state) => ({ transactions: [{ ...t, id: createId() }, ...state.transactions] })),
-      removeTransaction: (id) =>
-        set((state) => ({ transactions: state.transactions.filter((t) => t.id !== id) })),
+      addTransaction: (t) => {
+        const id = createId();
+        set((state) => ({
+          transactions: [{ ...t, id }, ...state.transactions],
+          lastAccountId: t.accountId ?? state.lastAccountId,
+          accounts: t.accountId
+            ? state.accounts.map((a) =>
+                a.id === t.accountId
+                  ? { ...a, balance: a.balance + (t.type === 'income' ? t.amount : -t.amount) }
+                  : a,
+              )
+            : state.accounts,
+        }));
+        return id;
+      },
+      removeTransaction: (id) => {
+        const tx = get().transactions.find((t) => t.id === id);
+        set((state) => ({
+          transactions: state.transactions.filter((t) => t.id !== id),
+          accounts:
+            tx && tx.accountId
+              ? state.accounts.map((a) =>
+                  a.id === tx.accountId
+                    ? { ...a, balance: a.balance - (tx.type === 'income' ? tx.amount : -tx.amount) }
+                    : a,
+                )
+              : state.accounts,
+        }));
+      },
+
+      linkReceipt: (transactionId, receiptId) =>
+        set((state) => ({
+          transactions: state.transactions.map((t) => (t.id === transactionId ? { ...t, receiptId } : t)),
+        })),
 
       addBill: (b) =>
-        set((state) => ({ bills: [...state.bills, { ...b, id: createId(), paid: false }] })),
-      toggleBillPaid: (id) =>
+        set((state) => ({ bills: [...state.bills, { ...b, id: createId(), paid: false, paidTransactionId: null }] })),
+      markBillPaid: (id, transactionId) =>
         set((state) => ({
-          bills: state.bills.map((b) => (b.id === id ? { ...b, paid: !b.paid } : b)),
+          bills: state.bills.map((b) => (b.id === id ? { ...b, paid: true, paidTransactionId: transactionId } : b)),
+        })),
+      markBillUnpaid: (id) =>
+        set((state) => ({
+          bills: state.bills.map((b) => (b.id === id ? { ...b, paid: false, paidTransactionId: null } : b)),
         })),
       removeBill: (id) => set((state) => ({ bills: state.bills.filter((b) => b.id !== id) })),
 
       addSubscription: (s) =>
         set((state) => ({ subscriptions: [...state.subscriptions, { ...s, id: createId() }] })),
+      updateSubscription: (id, patch) =>
+        set((state) => ({
+          subscriptions: state.subscriptions.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+        })),
       removeSubscription: (id) =>
         set((state) => ({ subscriptions: state.subscriptions.filter((s) => s.id !== id) })),
 
@@ -89,6 +133,10 @@ export const useMoneyStore = create<MoneyState>()(
 
       addRecurringIncome: (i) =>
         set((state) => ({ recurringIncomes: [...state.recurringIncomes, { ...i, id: createId() }] })),
+      updateRecurringIncome: (id, patch) =>
+        set((state) => ({
+          recurringIncomes: state.recurringIncomes.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+        })),
       removeRecurringIncome: (id) =>
         set((state) => ({ recurringIncomes: state.recurringIncomes.filter((i) => i.id !== id) })),
 

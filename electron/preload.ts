@@ -21,4 +21,5 @@ contextBridge.exposeInMainWorld('nexus', {
     ipcRenderer.on('games:session-ended', listener);
     return () => ipcRenderer.removeListener('games:session-ended', listener);
   },
+  scanReceiptImage: (imageDataUrl: string) => ipcRenderer.invoke('receipts:scan', { imageDataUrl }),
 });

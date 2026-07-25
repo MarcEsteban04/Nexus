@@ -171,6 +171,86 @@ ipcMain.handle(
   },
 );
 
+function extractJsonObject(text: string): any | null {
+  const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+interface ScannedReceipt {
+  store: string;
+  product: string;
+  amount: number | null;
+  category: string;
+  purchaseDate: string;
+}
+
+ipcMain.handle(
+  'receipts:scan',
+  async (_event, { imageDataUrl }: { imageDataUrl: string }): Promise<{ result: ScannedReceipt | null; error: string | null }> => {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return { result: null, error: 'No OPENAI_API_KEY found in .env.local.' };
+    if (!imageDataUrl) return { result: null, error: 'No receipt photo provided.' };
+
+    try {
+      const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a receipt-scanning assistant. Look at the photo of a store receipt and extract: store (string, the merchant/store name), product (string, a short 3-8 word summary of what was purchased — e.g. "Groceries" or "Coffee and pastry"), amount (number, the final total paid, numeric only, no currency symbol), category (string, a short spending category like "Groceries", "Dining", "Transport", "Utilities"), purchaseDate (string, YYYY-MM-DD, use the date printed on the receipt; if you cannot find one, omit it). Return ONLY a raw JSON object (no markdown fences, no prose) with exactly those keys. If a field truly cannot be read, use an empty string for text fields or null for amount.',
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Extract the purchase details from this receipt photo.' },
+                { type: 'image_url', image_url: { url: imageDataUrl } },
+              ],
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        return { result: null, error: `OpenAI request failed (${res.status}): ${body.slice(0, 200)}` };
+      }
+
+      const data = await res.json();
+      const content: string = data?.choices?.[0]?.message?.content ?? '';
+      const obj = extractJsonObject(content);
+      if (!obj) return { result: null, error: "Couldn't read that receipt. Try a clearer photo." };
+
+      const result: ScannedReceipt = {
+        store: typeof obj.store === 'string' ? obj.store : '',
+        product: typeof obj.product === 'string' ? obj.product : '',
+        amount: typeof obj.amount === 'number' ? obj.amount : null,
+        category: typeof obj.category === 'string' ? obj.category : '',
+        purchaseDate: typeof obj.purchaseDate === 'string' ? obj.purchaseDate : '',
+      };
+      return { result, error: null };
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { result: null, error: 'OpenAI request timed out after 45s. Check your connection and try again.' };
+      }
+      return { result: null, error: err instanceof Error ? err.message : 'Unknown error contacting OpenAI.' };
+    }
+  },
+);
+
 interface DetectedShortcut {
   name: string;
   path: string;

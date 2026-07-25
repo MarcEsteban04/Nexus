@@ -1,22 +1,97 @@
-import { FormEvent, useState } from 'react';
-import { CreditCard, Plus, X } from 'lucide-react';
+import { ChangeEvent, FormEvent, useState } from 'react';
+import { CreditCard, Plus, X, ImagePlus, CheckCircle2 } from 'lucide-react';
 import Card from '@/components/Card';
 import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import ProgressBar from '@/components/ProgressBar';
-import { inputClass, buttonPrimaryClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import Select from '@/components/Select';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
+import { useLinkedTransaction } from '@/hooks/useLinkedTransaction';
 import { formatCurrency } from '@/utils/money';
+import { Debt as DebtType } from '@/types';
+
+function LogPaymentDrawer({ debt, onClose }: { debt: DebtType | null; onClose: () => void }) {
+  const { accounts, lastAccountId, makeDebtPayment } = useMoneyStore();
+  const createLinkedTransaction = useLinkedTransaction();
+  const [amount, setAmount] = useState('');
+  const [accountId, setAccountId] = useState(lastAccountId ?? '');
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+
+  function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setReceiptImage(String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function confirm() {
+    const value = parseFloat(amount);
+    if (!debt || !value || !accountId) return;
+    createLinkedTransaction({
+      type: 'expense',
+      amount: value,
+      category: debt.name,
+      note: `Debt payment — ${debt.name}`,
+      date: new Date().toISOString().slice(0, 10),
+      accountId,
+      receiptImage,
+    });
+    makeDebtPayment(debt.id, value);
+    setAmount('');
+    setReceiptImage(null);
+    onClose();
+  }
+
+  return (
+    <Drawer open={!!debt} onClose={onClose} title="Log a payment">
+      {debt && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-surface-800 p-3 text-[13px]">
+            <p className="font-medium text-surface-100">{debt.name}</p>
+            <p className="text-surface-500">{formatCurrency(debt.remainingAmount)} remaining</p>
+          </div>
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Payment amount" type="number" className={`w-full ${inputClass}`} />
+          <div>
+            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-surface-400">
+              Pay from account
+            </label>
+            {accounts.length === 0 ? (
+              <p className="text-[12px] text-surface-500">No accounts yet — add one in Accounts first.</p>
+            ) : (
+              <Select
+                value={accountId}
+                onChange={setAccountId}
+                options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${formatCurrency(a.balance)})` }))}
+                className="w-full"
+              />
+            )}
+          </div>
+          <label className={`flex w-full cursor-pointer items-center justify-center gap-2 ${buttonSecondaryClass}`}>
+            <ImagePlus size={13} /> {receiptImage ? 'Receipt attached' : 'Attach receipt (optional)'}
+            <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+          </label>
+          {receiptImage && <img src={receiptImage} alt="" className="h-24 w-full rounded-lg object-cover" />}
+          <button onClick={confirm} disabled={!accountId || !parseFloat(amount || '0')} className={`w-full ${buttonPrimaryClass}`}>
+            <CheckCircle2 size={14} /> Log payment
+          </button>
+        </div>
+      )}
+    </Drawer>
+  );
+}
 
 export default function Debt() {
-  const { debts, addDebt, makeDebtPayment, removeDebt } = useMoneyStore();
+  const { debts, addDebt, removeDebt } = useMoneyStore();
   const [open, setOpen] = useState(false);
+  const [payTarget, setPayTarget] = useState<DebtType | null>(null);
   const [name, setName] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [interestRate, setInterestRate] = useState('');
   const [minPayment, setMinPayment] = useState('');
   const [dueDay, setDueDay] = useState('1');
-  const [paymentInputs, setPaymentInputs] = useState<Record<string, string>>({});
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -71,29 +146,9 @@ export default function Debt() {
               <span>of {formatCurrency(d.totalAmount)}</span>
             </div>
             <ProgressBar value={((d.totalAmount - d.remainingAmount) / d.totalAmount) * 100} />
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                value={paymentInputs[d.id] || ''}
-                onChange={(e) => setPaymentInputs((p) => ({ ...p, [d.id]: e.target.value }))}
-                placeholder="Log a payment"
-                type="number"
-                className={`w-40 ${inputClass}`}
-              />
-              <button
-                title="Log payment"
-                disabled={!parseFloat(paymentInputs[d.id] || '0')}
-                onClick={() => {
-                  const amt = parseFloat(paymentInputs[d.id] || '0');
-                  if (amt > 0) {
-                    makeDebtPayment(d.id, amt);
-                    setPaymentInputs((p) => ({ ...p, [d.id]: '' }));
-                  }
-                }}
-                className={buttonIconPrimaryClass}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
+            <button onClick={() => setPayTarget(d)} className={`mt-3 w-full ${buttonSecondaryClass}`}>
+              <Plus size={13} /> Log payment
+            </button>
           </div>
         ))}
       </div>
@@ -110,6 +165,8 @@ export default function Debt() {
           </button>
         </form>
       </Drawer>
+
+      <LogPaymentDrawer debt={payTarget} onClose={() => setPayTarget(null)} />
     </Card>
   );
 }

@@ -5,6 +5,8 @@ export interface Transaction {
   category: string;
   note: string;
   date: string;
+  accountId: string | null;
+  receiptId: string | null;
 }
 
 export interface Bill {
@@ -13,6 +15,7 @@ export interface Bill {
   amount: number;
   dueDay: number;
   paid: boolean;
+  paidTransactionId: string | null;
 }
 
 export type BillingCycle = 'weekly' | 'monthly' | 'yearly';
@@ -165,7 +168,16 @@ export interface Receipt {
   warrantyExpiry: string;
   notes: string;
   imageDataUrl: string | null;
+  transactionId: string | null;
   createdAt: string;
+}
+
+export interface ScannedReceipt {
+  store: string;
+  product: string;
+  amount: number | null;
+  category: string;
+  purchaseDate: string;
 }
 
 export interface CalendarEvent {

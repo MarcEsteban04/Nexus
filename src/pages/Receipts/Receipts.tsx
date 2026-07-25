@@ -1,12 +1,15 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
-import { Receipt as ReceiptIcon, Search, ShieldAlert, Wallet2, Plus, X, ImagePlus } from 'lucide-react';
+import { Receipt as ReceiptIcon, Search, ShieldAlert, Wallet2, Plus, X, ImagePlus, ArrowLeftRight, CheckCircle2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Drawer from '@/components/Drawer';
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
+import Select from '@/components/Select';
 import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useReceiptStore } from '@/store/receiptStore';
+import { useMoneyStore } from '@/store/moneyStore';
 import { formatCurrency } from '@/utils/money';
+import { Receipt } from '@/types';
 
 function daysUntil(dateStr: string): number | null {
   if (!dateStr) return null;
@@ -45,6 +48,7 @@ function AddReceiptForm() {
       warrantyExpiry,
       notes: '',
       imageDataUrl,
+      transactionId: null,
     });
     setStore('');
     setProduct('');
@@ -80,10 +84,67 @@ function AddReceiptForm() {
   );
 }
 
+function ConvertToTransactionDrawer({ receipt, onClose }: { receipt: Receipt | null; onClose: () => void }) {
+  const { accounts, addTransaction } = useMoneyStore();
+  const { linkTransaction } = useReceiptStore();
+  const [accountId, setAccountId] = useState('');
+
+  function confirm() {
+    if (!receipt || !accountId) return;
+    const txId = addTransaction({
+      type: 'expense',
+      amount: receipt.amount,
+      category: receipt.category || receipt.store || 'Uncategorized',
+      note: receipt.product,
+      date: receipt.purchaseDate,
+      accountId,
+      receiptId: receipt.id,
+    });
+    linkTransaction(receipt.id, txId);
+    setAccountId('');
+    onClose();
+  }
+
+  return (
+    <Drawer open={!!receipt} onClose={onClose} title="Convert to transaction">
+      {receipt && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-surface-800 p-3 text-[13px]">
+            <p className="font-medium text-surface-100">{receipt.product}</p>
+            <p className="text-surface-500">{receipt.store}</p>
+            <p className="mt-1 font-semibold text-rose-400">-{formatCurrency(receipt.amount)}</p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-surface-400">
+              Deduct from account
+            </label>
+            {accounts.length === 0 ? (
+              <p className="text-[12px] text-surface-500">
+                No accounts yet — add one in Money Manager → Accounts first.
+              </p>
+            ) : (
+              <Select
+                value={accountId}
+                onChange={setAccountId}
+                options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${formatCurrency(a.balance)})` }))}
+                className="w-full"
+              />
+            )}
+          </div>
+          <button onClick={confirm} disabled={!accountId} className={`w-full ${buttonPrimaryClass}`}>
+            <ArrowLeftRight size={14} /> Create transaction
+          </button>
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
 export default function Receipts() {
   const { receipts, removeReceipt } = useReceiptStore();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [convertTarget, setConvertTarget] = useState<Receipt | null>(null);
 
   const now = new Date();
   const totalSpentThisMonth = receipts
@@ -167,6 +228,18 @@ export default function Receipts() {
                         Warranty until {r.warrantyExpiry}
                       </p>
                     )}
+                    {r.transactionId ? (
+                      <p className="mt-2 flex items-center gap-1 text-[11px] text-emerald-400">
+                        <CheckCircle2 size={12} /> Linked to a transaction
+                      </p>
+                    ) : (
+                      <button
+                        onClick={() => setConvertTarget(r)}
+                        className={`mt-2 w-full ${buttonSecondaryClass}`}
+                      >
+                        <ArrowLeftRight size={13} /> Convert to transaction
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -178,6 +251,8 @@ export default function Receipts() {
       <Drawer open={open} onClose={() => setOpen(false)} title="Add receipt">
         <AddReceiptForm />
       </Drawer>
+
+      <ConvertToTransactionDrawer receipt={convertTarget} onClose={() => setConvertTarget(null)} />
     </div>
   );
 }
