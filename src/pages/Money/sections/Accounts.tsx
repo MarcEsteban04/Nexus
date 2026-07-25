@@ -1,13 +1,15 @@
 import { FormEvent, useState } from 'react';
-import { Landmark, Smartphone, Banknote, CircleDollarSign, Plus, Minus, X, Wallet } from 'lucide-react';
+import { Landmark, Smartphone, Banknote, CircleDollarSign, Plus, Minus, X, Wallet, Eye, EyeOff } from 'lucide-react';
 import Card from '@/components/Card';
 import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import Select from '@/components/Select';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
 import { formatCurrency } from '@/utils/money';
-import { AccountType } from '@/types';
+import { getInstitutionBadge } from '@/utils/institutionBadge';
+import { Account, AccountType } from '@/types';
 
 const TYPE_META: Record<AccountType, { label: string; icon: typeof Landmark }> = {
   bank: { label: 'Bank', icon: Landmark },
@@ -15,6 +17,87 @@ const TYPE_META: Record<AccountType, { label: string; icon: typeof Landmark }> =
   cash: { label: 'Cash', icon: Banknote },
   other: { label: 'Other', icon: CircleDollarSign },
 };
+
+function AccountCard({
+  account,
+  adjustValue,
+  onAdjustChange,
+  onDeposit,
+  onWithdraw,
+  onDelete,
+}: {
+  account: Account;
+  adjustValue: string;
+  onAdjustChange: (v: string) => void;
+  onDeposit: () => void;
+  onWithdraw: () => void;
+  onDelete: () => void;
+}) {
+  const [hidden, setHidden] = useState(false);
+  const badge = getInstitutionBadge(account.institution);
+  const Icon = TYPE_META[account.type].icon;
+
+  return (
+    <div className="rounded-xl border border-surface-800 p-3">
+      <div className="mb-2 flex items-start justify-between">
+        <div className="flex items-center gap-2.5">
+          {badge ? (
+            <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-[11px] font-bold ${badge.className}`}>
+              {badge.label}
+            </div>
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-500/15 text-accent-400">
+              <Icon size={16} />
+            </div>
+          )}
+          <div>
+            <p className="text-[13px] font-medium text-surface-100">{account.name}</p>
+            <p className="text-[11px] text-surface-500">
+              {TYPE_META[account.type].label}
+              {account.institution && ` · ${account.institution}`}
+            </p>
+          </div>
+        </div>
+        <button onClick={onDelete} className={buttonGhostIconClass}>
+          <X size={14} />
+        </button>
+      </div>
+      <div className="mb-3 flex items-center gap-2">
+        <p className="text-[20px] font-semibold tracking-tight text-surface-100">
+          {hidden ? '₱ • • • • •' : formatCurrency(account.balance)}
+        </p>
+        <button onClick={() => setHidden((h) => !h)} className="text-surface-500 transition-colors hover:text-surface-200">
+          {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          value={adjustValue}
+          onChange={(e) => onAdjustChange(e.target.value)}
+          placeholder="Amount"
+          type="number"
+          className={`min-w-0 flex-1 ${inputClass}`}
+        />
+        <button
+          title="Deposit"
+          disabled={!parseFloat(adjustValue || '0')}
+          onClick={onDeposit}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 transition-colors hover:bg-emerald-500/25 disabled:pointer-events-none disabled:opacity-40"
+        >
+          <Plus size={15} />
+        </button>
+        <button
+          title="Withdraw"
+          disabled={!parseFloat(adjustValue || '0')}
+          onClick={onWithdraw}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 text-rose-400 transition-colors hover:bg-rose-500/25 disabled:pointer-events-none disabled:opacity-40"
+        >
+          <Minus size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Accounts() {
   const { accounts, addAccount, adjustAccountBalance, removeAccount } = useMoneyStore();
@@ -24,6 +107,7 @@ export default function Accounts() {
   const [institution, setInstitution] = useState('');
   const [balance, setBalance] = useState('');
   const [adjustInputs, setAdjustInputs] = useState<Record<string, string>>({});
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -54,68 +138,29 @@ export default function Accounts() {
             <EmptyState icon={Wallet} label="No accounts yet. Add your e-wallets or bank accounts above." />
           </div>
         )}
-        {accounts.map((acc) => {
-          const Icon = TYPE_META[acc.type].icon;
-          return (
-            <div key={acc.id} className="rounded-xl border border-surface-800 p-3">
-              <div className="mb-2 flex items-start justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-500/15 text-accent-400">
-                    <Icon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-medium text-surface-100">{acc.name}</p>
-                    <p className="text-[11px] text-surface-500">
-                      {TYPE_META[acc.type].label}
-                      {acc.institution && ` · ${acc.institution}`}
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => removeAccount(acc.id)} className={buttonGhostIconClass}>
-                  <X size={14} />
-                </button>
-              </div>
-              <p className="mb-3 text-[20px] font-semibold tracking-tight text-surface-100">{formatCurrency(acc.balance)}</p>
-              <div className="flex items-center gap-2">
-                <input
-                  value={adjustInputs[acc.id] || ''}
-                  onChange={(e) => setAdjustInputs((p) => ({ ...p, [acc.id]: e.target.value }))}
-                  placeholder="Amount"
-                  type="number"
-                  className={`min-w-0 flex-1 ${inputClass}`}
-                />
-                <button
-                  title="Deposit"
-                  disabled={!parseFloat(adjustInputs[acc.id] || '0')}
-                  onClick={() => {
-                    const amt = parseFloat(adjustInputs[acc.id] || '0');
-                    if (amt > 0) {
-                      adjustAccountBalance(acc.id, amt);
-                      setAdjustInputs((p) => ({ ...p, [acc.id]: '' }));
-                    }
-                  }}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 transition-colors hover:bg-emerald-500/25 disabled:pointer-events-none disabled:opacity-40"
-                >
-                  <Plus size={15} />
-                </button>
-                <button
-                  title="Withdraw"
-                  disabled={!parseFloat(adjustInputs[acc.id] || '0')}
-                  onClick={() => {
-                    const amt = parseFloat(adjustInputs[acc.id] || '0');
-                    if (amt > 0) {
-                      adjustAccountBalance(acc.id, -amt);
-                      setAdjustInputs((p) => ({ ...p, [acc.id]: '' }));
-                    }
-                  }}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 text-rose-400 transition-colors hover:bg-rose-500/25 disabled:pointer-events-none disabled:opacity-40"
-                >
-                  <Minus size={15} />
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {accounts.map((acc) => (
+          <AccountCard
+            key={acc.id}
+            account={acc}
+            adjustValue={adjustInputs[acc.id] || ''}
+            onAdjustChange={(v) => setAdjustInputs((p) => ({ ...p, [acc.id]: v }))}
+            onDeposit={() => {
+              const amt = parseFloat(adjustInputs[acc.id] || '0');
+              if (amt > 0) {
+                adjustAccountBalance(acc.id, amt);
+                setAdjustInputs((p) => ({ ...p, [acc.id]: '' }));
+              }
+            }}
+            onWithdraw={() => {
+              const amt = parseFloat(adjustInputs[acc.id] || '0');
+              if (amt > 0) {
+                adjustAccountBalance(acc.id, -amt);
+                setAdjustInputs((p) => ({ ...p, [acc.id]: '' }));
+              }
+            }}
+            onDelete={() => setDeleteTarget(acc)}
+          />
+        ))}
       </div>
 
       <Drawer open={open} onClose={() => setOpen(false)} title="Add account">
@@ -139,6 +184,21 @@ export default function Accounts() {
           </button>
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete account"
+        message={
+          deleteTarget
+            ? `Delete "${deleteTarget.name}"? This won't delete its past transactions, but you'll lose track of its balance (${formatCurrency(deleteTarget.balance)}).`
+            : ''
+        }
+        onConfirm={() => {
+          if (deleteTarget) removeAccount(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </Card>
   );
 }

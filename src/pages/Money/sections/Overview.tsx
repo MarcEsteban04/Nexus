@@ -1,13 +1,23 @@
+import { useEffect } from 'react';
 import { TrendingUp, TrendingDown, PiggyBank, Receipt, CreditCard, Repeat, Wallet, Landmark } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import Card from '@/components/Card';
 import EmptyState from '@/components/EmptyState';
 import ProgressBar from '@/components/ProgressBar';
 import { useMoneyStore } from '@/store/moneyStore';
+import { usePayoneerStore } from '@/store/payoneerStore';
 import { formatCurrency, toMonthlyFromCycle, toMonthlyFromFrequency } from '@/utils/money';
 
 export default function Overview() {
   const { transactions, bills, subscriptions, debts, savingsGoals, recurringIncomes, accounts } = useMoneyStore();
+  const { midMarketRate, fetchMidMarketRate, effectiveRate } = usePayoneerStore();
+
+  const hasUsdIncome = recurringIncomes.some((i) => i.currency === 'USD');
+
+  useEffect(() => {
+    if (hasUsdIncome && midMarketRate === null) fetchMidMarketRate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasUsdIncome, midMarketRate]);
 
   const now = new Date();
   const monthly = transactions.filter((t) => {
@@ -18,7 +28,11 @@ export default function Overview() {
   const expenses = monthly.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
 
   const monthlySubscriptionCost = subscriptions.reduce((a, s) => a + toMonthlyFromCycle(s.amount, s.cycle), 0);
-  const monthlyRecurringIncome = recurringIncomes.reduce((a, i) => a + toMonthlyFromFrequency(i.amount, i.frequency), 0);
+  const rate = effectiveRate();
+  const monthlyRecurringIncome = recurringIncomes.reduce((a, i) => {
+    const monthlyInOwnCurrency = toMonthlyFromFrequency(i.amount, i.frequency);
+    return a + (i.currency === 'USD' ? monthlyInOwnCurrency * (rate ?? 0) : monthlyInOwnCurrency);
+  }, 0);
   const totalDebt = debts.reduce((a, d) => a + d.remainingAmount, 0);
   const unpaidBills = bills.filter((b) => !b.paid);
   const totalBalance = accounts.reduce((a, acc) => a + acc.balance, 0);

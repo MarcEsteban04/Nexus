@@ -47,14 +47,18 @@ export interface SavingsGoal {
   deadline: string;
 }
 
-export type IncomeFrequency = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+export type IncomeFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly' | 'yearly';
+export type IncomeCurrency = 'PHP' | 'USD';
 
 export interface RecurringIncome {
   id: string;
   name: string;
   amount: number;
+  currency: IncomeCurrency;
   frequency: IncomeFrequency;
   nextDate: string;
+  payDay1: number | null;
+  payDay2: number | null;
 }
 
 export type AccountType = 'bank' | 'ewallet' | 'cash' | 'other';
