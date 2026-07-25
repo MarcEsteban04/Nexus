@@ -8,13 +8,43 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
+:root {
+  color-scheme: light;
+
+  --c-surface-50: 23 23 26;
+  --c-surface-100: 32 32 36;
+  --c-surface-200: 64 64 71;
+  --c-surface-300: 94 94 102;
+  --c-surface-400: 128 128 137;
+  --c-surface-500: 158 158 168;
+  --c-surface-600: 200 200 207;
+  --c-surface-700: 222 222 227;
+  --c-surface-800: 233 233 237;
+  --c-surface-850: 240 240 243;
+  --c-surface-900: 255 255 255;
+  --c-surface-950: 247 247 249;
+}
+
+:root.dark {
   color-scheme: dark;
+
+  --c-surface-50: 246 246 246;
+  --c-surface-100: 233 233 233;
+  --c-surface-200: 209 209 209;
+  --c-surface-300: 168 168 168;
+  --c-surface-400: 125 125 125;
+  --c-surface-500: 86 86 86;
+  --c-surface-600: 61 61 61;
+  --c-surface-700: 44 44 44;
+  --c-surface-800: 33 33 33;
+  --c-surface-850: 27 27 27;
+  --c-surface-900: 22 22 22;
+  --c-surface-950: 16 16 16;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: theme('colors.surface.600') transparent;
+  scrollbar-color: rgb(var(--c-surface-600)) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -22,17 +52,18 @@ html {
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: theme('colors.surface.700');
+  background: rgb(var(--c-surface-700));
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: theme('colors.surface.600');
+  background: rgb(var(--c-surface-600));
 }
 
 body {
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 ::selection {

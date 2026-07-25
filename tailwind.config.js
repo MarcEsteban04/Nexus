@@ -1,3 +1,12 @@
+function withOpacity(variableName) {
+  return ({ opacityValue }) => {
+    if (opacityValue !== undefined) {
+      return `rgb(var(${variableName}) / ${opacityValue})`;
+    }
+    return `rgb(var(${variableName}))`;
+  };
+}
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
@@ -6,19 +15,19 @@ export default {
     extend: {
       colors: {
         surface: {
-          DEFAULT: '#161616',
-          50: '#f6f6f6',
-          100: '#e9e9e9',
-          200: '#d1d1d1',
-          300: '#a8a8a8',
-          400: '#7d7d7d',
-          500: '#565656',
-          600: '#3d3d3d',
-          700: '#2c2c2c',
-          800: '#212121',
-          850: '#1b1b1b',
-          900: '#161616',
-          950: '#101010',
+          DEFAULT: withOpacity('--c-surface-900'),
+          50: withOpacity('--c-surface-50'),
+          100: withOpacity('--c-surface-100'),
+          200: withOpacity('--c-surface-200'),
+          300: withOpacity('--c-surface-300'),
+          400: withOpacity('--c-surface-400'),
+          500: withOpacity('--c-surface-500'),
+          600: withOpacity('--c-surface-600'),
+          700: withOpacity('--c-surface-700'),
+          800: withOpacity('--c-surface-800'),
+          850: withOpacity('--c-surface-850'),
+          900: withOpacity('--c-surface-900'),
+          950: withOpacity('--c-surface-950'),
         },
         accent: {
           DEFAULT: '#e35d3f',
