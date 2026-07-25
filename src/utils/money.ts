@@ -1,5 +1,12 @@
 import { BillingCycle, IncomeFrequency } from '@/types';
 
+function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function formatCurrency(n: number): string {
   return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
@@ -45,7 +52,7 @@ export function advanceDate(dateStr: string, unit: SimpleRecurrence): string {
       base.setFullYear(base.getFullYear() + 1);
       break;
   }
-  return base.toISOString().slice(0, 10);
+  return toDateKey(base);
 }
 
 export function advanceSemiMonthly(dateStr: string, payDay1: number, payDay2: number): string {
@@ -55,9 +62,9 @@ export function advanceSemiMonthly(dateStr: string, payDay1: number, payDay2: nu
   const hi = Math.max(payDay1, payDay2);
   const currentDay = base.getDate();
   if (currentDay < hi) {
-    return new Date(base.getFullYear(), base.getMonth(), hi).toISOString().slice(0, 10);
+    return toDateKey(new Date(base.getFullYear(), base.getMonth(), hi));
   }
-  return new Date(base.getFullYear(), base.getMonth() + 1, lo).toISOString().slice(0, 10);
+  return toDateKey(new Date(base.getFullYear(), base.getMonth() + 1, lo));
 }
 
 export function nextOccurrenceForDay(day: number): string {
@@ -65,7 +72,17 @@ export function nextOccurrenceForDay(day: number): string {
   const clampedDay = Math.min(Math.max(day, 1), 31);
   let d = new Date(now.getFullYear(), now.getMonth(), clampedDay);
   if (d < now) d = new Date(now.getFullYear(), now.getMonth() + 1, clampedDay);
-  return d.toISOString().slice(0, 10);
+  return toDateKey(d);
+}
+
+export function nextSemiMonthlyOccurrence(payDay1: number, payDay2: number): string {
+  const now = new Date();
+  const lo = Math.min(payDay1, payDay2);
+  const hi = Math.max(payDay1, payDay2);
+  const day = now.getDate();
+  if (day < lo) return toDateKey(new Date(now.getFullYear(), now.getMonth(), lo));
+  if (day < hi) return toDateKey(new Date(now.getFullYear(), now.getMonth(), hi));
+  return toDateKey(new Date(now.getFullYear(), now.getMonth() + 1, lo));
 }
 
 export function dayOfMonth(dateStr: string): number {

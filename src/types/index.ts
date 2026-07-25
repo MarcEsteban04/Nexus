@@ -184,6 +184,8 @@ export interface ScannedReceipt {
   purchaseDate: string;
 }
 
+export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -191,5 +193,7 @@ export interface CalendarEvent {
   time: string;
   category: string;
   notes: string;
+  recurrence: EventRecurrence;
+  reminderMinutes: number | null;
   createdAt: string;
 }

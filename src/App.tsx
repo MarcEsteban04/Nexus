@@ -18,8 +18,10 @@ import Gaming from '@/pages/Gaming/Gaming';
 import AIWorkspace from '@/pages/AIWorkspace/AIWorkspace';
 import Receipts from '@/pages/Receipts/Receipts';
 import Calendar from '@/pages/Calendar/Calendar';
+import { useEventReminders } from '@/hooks/useEventReminders';
 
 export default function App() {
+  useEventReminders();
   return (
     <Routes>
       <Route element={<MainLayout />}>

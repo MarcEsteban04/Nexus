@@ -14,6 +14,7 @@ import {
   advanceDate,
   advanceSemiMonthly,
   nextOccurrenceForDay,
+  nextSemiMonthlyOccurrence,
   dayOfMonth,
 } from '@/utils/money';
 import { IncomeCurrency, IncomeFrequency, RecurringIncome as RecurringIncomeType } from '@/types';
@@ -67,7 +68,7 @@ function IncomeForm({
       amount: value,
       currency,
       frequency,
-      nextDate: isSemiMonthly ? nextOccurrenceForDay(Math.min(d1, d2)) : nextOccurrenceForDay(d1),
+      nextDate: isSemiMonthly ? nextSemiMonthlyOccurrence(d1, d2) : nextOccurrenceForDay(d1),
       payDay1: isSemiMonthly ? d1 : null,
       payDay2: isSemiMonthly ? d2 : null,
     });
