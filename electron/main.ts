@@ -1,5 +1,8 @@
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import { spawn, ChildProcess } from 'child_process';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: path.join(app.getAppPath(), '.env.local') });
@@ -165,6 +168,130 @@ ipcMain.handle(
       }
       return { results: [], error: err instanceof Error ? err.message : 'Unknown error contacting OpenAI.' };
     }
+  },
+);
+
+interface DetectedShortcut {
+  name: string;
+  path: string;
+  targetPath: string | null;
+  spawnPath: string | null;
+  icon: string | null;
+}
+
+function parseUrlShortcut(fullPath: string): { url: string | null; iconFile: string | null } {
+  try {
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const url = content.match(/^URL=(.+)$/m)?.[1]?.trim() ?? null;
+    const iconFile = content.match(/^IconFile=(.+)$/m)?.[1]?.trim() ?? null;
+    return { url, iconFile };
+  } catch {
+    return { url: null, iconFile: null };
+  }
+}
+
+function resolveSpawnPath(ext: string, fullPath: string, targetPath: string | null): string | null {
+  if (ext === '.exe') return fullPath;
+  if (ext === '.lnk' && targetPath && path.extname(targetPath).toLowerCase() === '.exe' && fs.existsSync(targetPath)) {
+    return targetPath;
+  }
+  return null;
+}
+
+async function resolveIcon(candidatePaths: (string | null)[]): Promise<string | null> {
+  for (const candidate of candidatePaths) {
+    if (!candidate || !fs.existsSync(candidate)) continue;
+    try {
+      const image = await app.getFileIcon(candidate, { size: 'normal' });
+      if (!image.isEmpty()) return image.toDataURL();
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
+}
+
+async function scanDesktopFolder(dir: string): Promise<DetectedShortcut[]> {
+  if (!fs.existsSync(dir)) return [];
+  const found: DetectedShortcut[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (ext !== '.lnk' && ext !== '.exe' && ext !== '.url') continue;
+    const fullPath = path.join(dir, entry.name);
+    const name = path.basename(entry.name, ext);
+
+    let targetPath: string | null = null;
+    let iconFile: string | null = null;
+    if (ext === '.lnk') {
+      try {
+        targetPath = shell.readShortcutLink(fullPath).target || null;
+      } catch {
+        targetPath = null;
+      }
+    } else if (ext === '.url') {
+      const parsed = parseUrlShortcut(fullPath);
+      targetPath = parsed.url;
+      iconFile = parsed.iconFile;
+    }
+
+    const spawnPath = resolveSpawnPath(ext, fullPath, targetPath);
+    const icon = await resolveIcon([iconFile, targetPath, fullPath]);
+    found.push({ name, path: fullPath, targetPath, spawnPath, icon });
+  }
+  return found;
+}
+
+ipcMain.handle('games:scan-desktop', async (): Promise<{ results: DetectedShortcut[]; error: string | null }> => {
+  try {
+    const desktops = [path.join(os.homedir(), 'Desktop'), 'C:\\Users\\Public\\Desktop'];
+    const seen = new Set<string>();
+    const results: DetectedShortcut[] = [];
+    for (const dir of desktops) {
+      for (const shortcut of await scanDesktopFolder(dir)) {
+        const key = shortcut.name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(shortcut);
+      }
+    }
+    results.sort((a, b) => a.name.localeCompare(b.name));
+    return { results, error: null };
+  } catch (err) {
+    return { results: [], error: err instanceof Error ? err.message : 'Could not scan the desktop.' };
+  }
+});
+
+const activeGameSessions = new Map<string, { child: ChildProcess; startedAt: number }>();
+
+ipcMain.handle(
+  'games:launch',
+  async (
+    event,
+    { gameId, execPath, spawnPath }: { gameId: string; execPath: string; spawnPath: string | null },
+  ): Promise<{ error: string | null; tracked: boolean }> => {
+    if (spawnPath && fs.existsSync(spawnPath)) {
+      try {
+        const child = spawn(spawnPath, [], { detached: true, stdio: 'ignore', cwd: path.dirname(spawnPath) });
+        activeGameSessions.set(gameId, { child, startedAt: Date.now() });
+        child.on('exit', () => {
+          const session = activeGameSessions.get(gameId);
+          activeGameSessions.delete(gameId);
+          if (session) {
+            const hours = (Date.now() - session.startedAt) / 3_600_000;
+            event.sender.send('games:session-ended', { gameId, hours });
+          }
+        });
+        child.unref();
+        return { error: null, tracked: true };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Could not launch game.', tracked: false };
+      }
+    }
+
+    if (!fs.existsSync(execPath)) return { error: 'That file no longer exists at the saved path.', tracked: false };
+    const result = await shell.openPath(execPath);
+    return { error: result || null, tracked: false };
   },
 );
 

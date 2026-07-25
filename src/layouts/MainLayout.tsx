@@ -18,6 +18,9 @@ import {
   Coins,
   Landmark,
   ShieldCheck,
+  Gamepad2,
+  Sparkles,
+  CalendarDays,
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import TitleBar from '@/components/TitleBar';
@@ -42,6 +45,10 @@ const NAV_ITEMS = [
   },
   { to: '/vault', label: 'Password Vault', icon: ShieldCheck },
   { to: '/shopping', label: 'Shopping Hub', icon: ShoppingBag },
+  { to: '/gaming', label: 'Gaming Dashboard', icon: Gamepad2 },
+  { to: '/ai', label: 'AI Workspace', icon: Sparkles },
+  { to: '/receipts', label: 'Receipt Vault', icon: Receipt },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/toolbox', label: 'Dev Toolbox', icon: Wrench },
 ];
 

@@ -13,4 +13,12 @@ contextBridge.exposeInMainWorld('nexus', {
   },
   searchProductPrices: (query: string) => ipcRenderer.invoke('shopping:search-prices', { query }),
   parseImportText: (text: string) => ipcRenderer.invoke('vault:parse-import', { text }),
+  scanDesktopGames: () => ipcRenderer.invoke('games:scan-desktop'),
+  launchGame: (gameId: string, execPath: string, spawnPath: string | null) =>
+    ipcRenderer.invoke('games:launch', { gameId, execPath, spawnPath }),
+  onGameSessionEnded: (cb: (payload: { gameId: string; hours: number }) => void) => {
+    const listener = (_: unknown, payload: { gameId: string; hours: number }) => cb(payload);
+    ipcRenderer.on('games:session-ended', listener);
+    return () => ipcRenderer.removeListener('games:session-ended', listener);
+  },
 });

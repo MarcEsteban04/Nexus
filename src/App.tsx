@@ -14,6 +14,10 @@ import ExchangeRate from '@/pages/Money/sections/ExchangeRate';
 import Shopping from '@/pages/Shopping/Shopping';
 import Toolbox from '@/pages/Toolbox/Toolbox';
 import Vault from '@/pages/Vault/Vault';
+import Gaming from '@/pages/Gaming/Gaming';
+import AIWorkspace from '@/pages/AIWorkspace/AIWorkspace';
+import Receipts from '@/pages/Receipts/Receipts';
+import Calendar from '@/pages/Calendar/Calendar';
 
 export default function App() {
   return (
@@ -34,6 +38,10 @@ export default function App() {
         </Route>
         <Route path="/vault" element={<Vault />} />
         <Route path="/shopping" element={<Shopping />} />
+        <Route path="/gaming" element={<Gaming />} />
+        <Route path="/ai" element={<AIWorkspace />} />
+        <Route path="/receipts" element={<Receipts />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/toolbox" element={<Toolbox />} />
       </Route>
     </Routes>

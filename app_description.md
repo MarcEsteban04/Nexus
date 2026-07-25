@@ -151,26 +151,6 @@ Future Support
 
 ---
 
-## 📦 Package Tracker
-
-Track deliveries in one place.
-
-Features
-
-- Manual tracking
-- Delivery timeline
-- Purchase notes
-- Order history
-
-Future Support
-
-- Shopee
-- Lazada
-- J&T
-- Ninja Van
-
----
-
 ## 📊 Life Dashboard
 
 Visualize your digital life.
@@ -346,7 +326,6 @@ src/
 - Gaming Dashboard
 - AI Workspace
 - Receipt Vault
-- Package Tracker
 - Calendar
 
 ---

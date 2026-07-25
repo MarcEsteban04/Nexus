@@ -99,3 +99,81 @@ export interface WishlistItem {
   purchased: boolean;
   createdAt: string;
 }
+
+export type GameStatus = 'wishlist' | 'installed' | 'playing' | 'completed';
+
+export interface Game {
+  id: string;
+  title: string;
+  platform: string;
+  status: GameStatus;
+  hoursPlayed: number;
+  achievementsUnlocked: number;
+  achievementsTotal: number;
+  lastPlayed: string;
+  notes: string;
+  execPath: string | null;
+  spawnPath: string | null;
+  iconDataUrl: string | null;
+  createdAt: string;
+}
+
+export interface DetectedShortcut {
+  name: string;
+  path: string;
+  targetPath: string | null;
+  spawnPath: string | null;
+  icon: string | null;
+}
+
+export type AiModel = 'ChatGPT' | 'Claude' | 'Gemini' | 'DeepSeek' | 'Ollama' | 'Other';
+
+export interface Prompt {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  model: AiModel;
+  favorite: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Snippet {
+  id: string;
+  title: string;
+  language: string;
+  code: string;
+  createdAt: string;
+}
+
+export interface AiBookmark {
+  id: string;
+  title: string;
+  url: string;
+  notes: string;
+  createdAt: string;
+}
+
+export interface Receipt {
+  id: string;
+  store: string;
+  product: string;
+  amount: number;
+  category: string;
+  purchaseDate: string;
+  warrantyExpiry: string;
+  notes: string;
+  imageDataUrl: string | null;
+  createdAt: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  category: string;
+  notes: string;
+  createdAt: string;
+}
