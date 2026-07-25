@@ -1,15 +1,17 @@
 import { FormEvent, useState } from 'react';
 import { ArrowLeftRight, Download, Plus, X } from 'lucide-react';
 import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import Select from '@/components/Select';
-import { inputClass, buttonIconPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
 import { formatCurrency } from '@/utils/money';
 
 export default function Transactions() {
   const { transactions, addTransaction, removeTransaction } = useMoneyStore();
 
+  const [open, setOpen] = useState(false);
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
@@ -43,27 +45,15 @@ export default function Transactions() {
     <Card>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-surface-100">Transactions</h3>
-        <button onClick={exportCsv} className={buttonSecondaryClass}>
-          <Download size={13} /> Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportCsv} className={buttonSecondaryClass}>
+            <Download size={13} /> Export CSV
+          </button>
+          <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+            <Plus size={14} /> Add
+          </button>
+        </div>
       </div>
-      <form onSubmit={submitTransaction} className="mb-4 flex flex-wrap items-center gap-2">
-        <Select
-          value={type}
-          onChange={(v) => setType(v as 'income' | 'expense')}
-          options={[
-            { value: 'expense', label: 'Expense' },
-            { value: 'income', label: 'Income' },
-          ]}
-          className="w-28"
-        />
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" type="number" className={`w-28 ${inputClass}`} />
-        <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`min-w-0 flex-1 basis-28 ${inputClass}`} />
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" className={`min-w-0 flex-1 basis-28 ${inputClass}`} />
-        <button type="submit" title="Add transaction" className={buttonIconPrimaryClass}>
-          <Plus size={16} />
-        </button>
-      </form>
       <ul className="max-h-96 space-y-1 overflow-y-auto text-[13px]">
         {transactions.length === 0 && <EmptyState icon={ArrowLeftRight} label="No transactions yet." />}
         {transactions.map((t) => (
@@ -82,6 +72,26 @@ export default function Transactions() {
           </li>
         ))}
       </ul>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add transaction">
+        <form onSubmit={submitTransaction} className="space-y-3">
+          <Select
+            value={type}
+            onChange={(v) => setType(v as 'income' | 'expense')}
+            options={[
+              { value: 'expense', label: 'Expense' },
+              { value: 'income', label: 'Income' },
+            ]}
+            className="w-full"
+          />
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" type="number" className={`w-full ${inputClass}`} />
+          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-full ${inputClass}`} />
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" className={`w-full ${inputClass}`} />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add transaction
+          </button>
+        </form>
+      </Drawer>
     </Card>
   );
 }

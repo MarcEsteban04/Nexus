@@ -1,8 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { Star, Copy, X, Plus, Sparkles } from 'lucide-react';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import Select from '@/components/Select';
-import { inputClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useAiWorkspaceStore } from '@/store/aiWorkspaceStore';
 import { AiModel } from '@/types';
 
@@ -17,6 +18,7 @@ const MODEL_OPTIONS: { value: AiModel; label: string }[] = [
 
 export default function Prompts() {
   const { prompts, addPrompt, toggleFavoritePrompt, removePrompt } = useAiWorkspaceStore();
+  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [category, setCategory] = useState('');
@@ -35,25 +37,11 @@ export default function Prompts() {
 
   return (
     <div>
-      <form onSubmit={submit} className="mb-4 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Prompt title" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-32 ${inputClass}`} />
-          <Select value={model} onChange={(v) => setModel(v as AiModel)} options={MODEL_OPTIONS} className="w-40" />
-        </div>
-        <div className="flex items-start gap-2">
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Prompt text…"
-            rows={3}
-            className={`w-full font-mono text-[12px] ${inputClass}`}
-          />
-          <button type="submit" title="Save prompt" className={buttonIconPrimaryClass}>
-            <Plus size={16} />
-          </button>
-        </div>
-      </form>
+      <div className="mb-4 flex justify-end">
+        <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+          <Plus size={14} /> Add prompt
+        </button>
+      </div>
 
       <div className="space-y-2">
         {sorted.length === 0 && <EmptyState icon={Sparkles} label="No prompts saved yet." />}
@@ -81,6 +69,24 @@ export default function Prompts() {
           </div>
         ))}
       </div>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add prompt">
+        <form onSubmit={submit} className="space-y-3">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Prompt title" className={`w-full ${inputClass}`} />
+          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-full ${inputClass}`} />
+          <Select value={model} onChange={(v) => setModel(v as AiModel)} options={MODEL_OPTIONS} className="w-full" />
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Prompt text…"
+            rows={6}
+            className={`w-full font-mono text-[12px] ${inputClass}`}
+          />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add prompt
+          </button>
+        </form>
+      </Drawer>
     </div>
   );
 }

@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
-import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass, buttonIconPrimaryClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useVaultStore } from '@/store/vaultStore';
 import { PasswordEntry } from '@/types';
 import ImportModal from './ImportModal';
@@ -162,38 +163,43 @@ function EntryForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Gmail)" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username / email" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-      <div className="relative min-w-0 flex-1 basis-32">
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          type={reveal ? 'text' : 'password'}
-          className={`w-full pr-8 ${inputClass}`}
-        />
-        <button
-          type="button"
-          onClick={() => setReveal((r) => !r)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-200"
-        >
-          {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
+    <form onSubmit={submit} className="space-y-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Gmail)" className={`w-full ${inputClass}`} />
+      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username / email" className={`w-full ${inputClass}`} />
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            type={reveal ? 'text' : 'password'}
+            className={`w-full pr-8 ${inputClass}`}
+          />
+          <button
+            type="button"
+            onClick={() => setReveal((r) => !r)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-200"
+          >
+            {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+        <button type="button" title="Generate password" onClick={() => setPassword(generatePassword())} className={buttonSecondaryClass}>
+          <RefreshCw size={13} />
         </button>
       </div>
-      <button type="button" title="Generate password" onClick={() => setPassword(generatePassword())} className={buttonSecondaryClass}>
-        <RefreshCw size={13} />
-      </button>
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Site URL (optional)" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-      <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-      {initial && onCancel && (
-        <button type="button" onClick={onCancel} className={buttonSecondaryClass}>
-          Cancel
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Site URL (optional)" className={`w-full ${inputClass}`} />
+      <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" className={`w-full ${inputClass}`} />
+      <div className="flex items-center gap-2">
+        <button type="submit" className={`flex-1 ${buttonPrimaryClass}`}>
+          {initial ? <Pencil size={14} /> : <Plus size={14} />}
+          {initial ? 'Save changes' : 'Add password'}
         </button>
-      )}
-      <button type="submit" title={initial ? 'Save changes' : 'Add entry'} className={buttonIconPrimaryClass}>
-        {initial ? <Pencil size={16} /> : <Plus size={16} />}
-      </button>
+        {initial && onCancel && (
+          <button type="button" onClick={onCancel} className={buttonSecondaryClass}>
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }
@@ -315,6 +321,7 @@ function ChangeMasterPassword() {
 function UnlockedView() {
   const { entries, lock, addEntry, addEntries } = useVaultStore();
   const [importOpen, setImportOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <div>
@@ -325,22 +332,26 @@ function UnlockedView() {
             <Upload size={13} /> Import
           </button>
         </div>
-        <button onClick={lock} className={buttonSecondaryClass}>
-          <Lock size={13} /> Lock vault
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setAddOpen(true)} className={buttonPrimaryClass}>
+            <Plus size={14} /> Add password
+          </button>
+          <button onClick={lock} className={buttonSecondaryClass}>
+            <Lock size={13} /> Lock vault
+          </button>
+        </div>
       </div>
-      <Card>
-        <h3 className="mb-3 text-[13px] font-semibold text-surface-100">Add password</h3>
-        <EntryForm onSubmit={addEntry} />
-      </Card>
-      <div className="mt-4 space-y-2">
+      <div className="space-y-2">
         {entries.length === 0 ? (
-          <EmptyState icon={KeyRound} label="No passwords saved yet. Add your first one above." />
+          <EmptyState icon={KeyRound} label="No passwords saved yet. Click Add password above." />
         ) : (
           entries.map((entry) => <EntryRow key={entry.id} entry={entry} />)
         )}
       </div>
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImport={addEntries} />
+      <Drawer open={addOpen} onClose={() => setAddOpen(false)} title="Add password">
+        <EntryForm onSubmit={addEntry} />
+      </Drawer>
     </div>
   );
 }

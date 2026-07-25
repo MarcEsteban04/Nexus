@@ -1,9 +1,10 @@
 import { FormEvent, useState } from 'react';
 import { Landmark, Smartphone, Banknote, CircleDollarSign, Plus, Minus, X, Wallet } from 'lucide-react';
 import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import Select from '@/components/Select';
-import { inputClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
 import { formatCurrency } from '@/utils/money';
 import { AccountType } from '@/types';
@@ -17,6 +18,7 @@ const TYPE_META: Record<AccountType, { label: string; icon: typeof Landmark }> =
 
 export default function Accounts() {
   const { accounts, addAccount, adjustAccountBalance, removeAccount } = useMoneyStore();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('ewallet');
   const [institution, setInstitution] = useState('');
@@ -38,27 +40,13 @@ export default function Accounts() {
     <Card>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-surface-100">Accounts</h3>
-        <span className="text-[12px] text-surface-400">{formatCurrency(totalBalance)} total</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-surface-400">{formatCurrency(totalBalance)} total</span>
+          <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+            <Plus size={14} /> Add
+          </button>
+        </div>
       </div>
-      <form onSubmit={submit} className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Account name" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-        <Select
-          value={type}
-          onChange={(v) => setType(v as AccountType)}
-          options={[
-            { value: 'ewallet', label: 'E-wallet' },
-            { value: 'bank', label: 'Bank' },
-            { value: 'cash', label: 'Cash' },
-            { value: 'other', label: 'Other' },
-          ]}
-          className="w-32"
-        />
-        <input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="Provider (e.g. GCash)" className={`w-40 ${inputClass}`} />
-        <input value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Starting balance" type="number" className={`w-32 ${inputClass}`} />
-        <button type="submit" title="Add account" className={buttonIconPrimaryClass}>
-          <Plus size={16} />
-        </button>
-      </form>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {accounts.length === 0 && (
@@ -129,6 +117,28 @@ export default function Accounts() {
           );
         })}
       </div>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add account">
+        <form onSubmit={submit} className="space-y-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Account name" className={`w-full ${inputClass}`} />
+          <Select
+            value={type}
+            onChange={(v) => setType(v as AccountType)}
+            options={[
+              { value: 'ewallet', label: 'E-wallet' },
+              { value: 'bank', label: 'Bank' },
+              { value: 'cash', label: 'Cash' },
+              { value: 'other', label: 'Other' },
+            ]}
+            className="w-full"
+          />
+          <input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="Provider (e.g. GCash)" className={`w-full ${inputClass}`} />
+          <input value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Starting balance" type="number" className={`w-full ${inputClass}`} />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add account
+          </button>
+        </form>
+      </Drawer>
     </Card>
   );
 }

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Heart, ListChecks, Wallet2, CheckCircle2, Plus, Search, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatCard from '@/components/StatCard';
+import Drawer from '@/components/Drawer';
 import { inputClass, buttonPrimaryClass, buttonSecondaryClass } from '@/components/ui';
 import { useShoppingStore } from '@/store/shoppingStore';
 import { ProductSearchResult, WishlistItem } from '@/types';
@@ -79,6 +80,7 @@ export default function Shopping() {
   const [url, setUrl] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -118,27 +120,17 @@ export default function Shopping() {
           <StatCard label="Purchased" value={String(purchased.length)} icon={CheckCircle2} tone="positive" />
         </div>
 
-        <div className="mb-4 flex justify-end">
+        <div className="mb-6 flex justify-end gap-2">
           <button onClick={() => openSearch('')} className={buttonSecondaryClass}>
             <Search size={13} /> Find best price
           </button>
+          <button onClick={() => setAddOpen(true)} className={buttonPrimaryClass}>
+            <Plus size={14} /> Add item
+          </button>
         </div>
 
-        <form
-          onSubmit={submit}
-          className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-surface-800 bg-surface-900 p-3 shadow-card"
-        >
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Item name" className={`flex-1 basis-40 ${inputClass}`} />
-          <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price" type="number" className={`w-28 ${inputClass}`} />
-          <input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Store" className={`w-32 ${inputClass}`} />
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Link (optional)" className={`flex-1 basis-40 ${inputClass}`} />
-          <button type="submit" className={buttonPrimaryClass}>
-            <Plus size={14} /> Add
-          </button>
-        </form>
-
         {items.length === 0 ? (
-          <p className="text-[13px] text-surface-400">Your wishlist is empty. Add your first item above.</p>
+          <p className="text-[13px] text-surface-400">Your wishlist is empty. Click Add item above.</p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {items.map((item) => (
@@ -154,6 +146,18 @@ export default function Shopping() {
         initialQuery={searchQuery}
         onAddToWishlist={addFromSearchResult}
       />
+
+      <Drawer open={addOpen} onClose={() => setAddOpen(false)} title="Add wishlist item">
+        <form onSubmit={submit} className="space-y-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Item name" className={`w-full ${inputClass}`} />
+          <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price" type="number" className={`w-full ${inputClass}`} />
+          <input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Store" className={`w-full ${inputClass}`} />
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Link (optional)" className={`w-full ${inputClass}`} />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add item
+          </button>
+        </form>
+      </Drawer>
     </div>
   );
 }

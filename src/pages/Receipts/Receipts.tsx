@@ -1,10 +1,10 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 import { Receipt as ReceiptIcon, Search, ShieldAlert, Wallet2, Plus, X, ImagePlus } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
-import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
-import { inputClass, buttonIconPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useReceiptStore } from '@/store/receiptStore';
 import { formatCurrency } from '@/utils/money';
 
@@ -56,25 +56,25 @@ function AddReceiptForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-      <input value={product} onChange={(e) => setProduct(e.target.value)} placeholder="Product" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-      <input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Store" className={`w-32 ${inputClass}`} />
-      <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" type="number" className={`w-28 ${inputClass}`} />
-      <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-28 ${inputClass}`} />
-      <label className="flex flex-col gap-1 text-[11px] text-surface-500">
+    <form onSubmit={submit} className="space-y-3">
+      <input value={product} onChange={(e) => setProduct(e.target.value)} placeholder="Product" className={`w-full ${inputClass}`} />
+      <input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Store" className={`w-full ${inputClass}`} />
+      <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" type="number" className={`w-full ${inputClass}`} />
+      <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-full ${inputClass}`} />
+      <label className="block text-[11px] text-surface-500">
         Purchase date
-        <input value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} type="date" className={inputClass} />
+        <input value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} type="date" className={`mt-1 w-full ${inputClass}`} />
       </label>
-      <label className="flex flex-col gap-1 text-[11px] text-surface-500">
+      <label className="block text-[11px] text-surface-500">
         Warranty expiry
-        <input value={warrantyExpiry} onChange={(e) => setWarrantyExpiry(e.target.value)} type="date" className={inputClass} />
+        <input value={warrantyExpiry} onChange={(e) => setWarrantyExpiry(e.target.value)} type="date" className={`mt-1 w-full ${inputClass}`} />
       </label>
-      <label className={`${buttonSecondaryClass} cursor-pointer`}>
+      <label className={`w-full cursor-pointer ${buttonSecondaryClass}`}>
         <ImagePlus size={13} /> {imageDataUrl ? 'Photo added' : 'Add photo'}
         <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
       </label>
-      <button type="submit" title="Add receipt" className={buttonIconPrimaryClass}>
-        <Plus size={16} />
+      <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+        <Plus size={14} /> Add receipt
       </button>
     </form>
   );
@@ -83,6 +83,7 @@ function AddReceiptForm() {
 export default function Receipts() {
   const { receipts, removeReceipt } = useReceiptStore();
   const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
 
   const now = new Date();
   const totalSpentThisMonth = receipts
@@ -105,7 +106,15 @@ export default function Receipts() {
 
   return (
     <div>
-      <PageHeader title="Receipt Vault" subtitle="Never lose a receipt again." />
+      <PageHeader
+        title="Receipt Vault"
+        subtitle="Never lose a receipt again."
+        actions={
+          <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+            <Plus size={14} /> Add receipt
+          </button>
+        }
+      />
       <div className="p-8">
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatCard label="Receipts saved" value={String(receipts.length)} icon={ReceiptIcon} />
@@ -118,11 +127,6 @@ export default function Receipts() {
           />
         </div>
 
-        <Card className="mb-4">
-          <h3 className="mb-3 text-[13px] font-semibold text-surface-100">Add receipt</h3>
-          <AddReceiptForm />
-        </Card>
-
         <div className="relative mb-4">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
           <input
@@ -134,7 +138,7 @@ export default function Receipts() {
         </div>
 
         {filtered.length === 0 ? (
-          <EmptyState icon={ReceiptIcon} label="No receipts match. Add one above." />
+          <EmptyState icon={ReceiptIcon} label="No receipts match. Click Add receipt above." />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((r) => {
@@ -170,6 +174,10 @@ export default function Receipts() {
           </div>
         )}
       </div>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add receipt">
+        <AddReceiptForm />
+      </Drawer>
     </div>
   );
 }

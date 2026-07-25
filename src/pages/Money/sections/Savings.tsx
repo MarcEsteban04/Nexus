@@ -1,14 +1,16 @@
 import { FormEvent, useState } from 'react';
 import { PiggyBank, Plus, X } from 'lucide-react';
 import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
 import ProgressBar from '@/components/ProgressBar';
-import { inputClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
 import { formatCurrency } from '@/utils/money';
 
 export default function Savings() {
   const { savingsGoals, addSavingsGoal, contributeToSavingsGoal, removeSavingsGoal } = useMoneyStore();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [deadline, setDeadline] = useState('');
@@ -26,15 +28,12 @@ export default function Savings() {
 
   return (
     <Card>
-      <h3 className="mb-3 text-[13px] font-semibold text-surface-100">Savings goals</h3>
-      <form onSubmit={submit} className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Goal name" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-        <input value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="Target" type="number" className={`w-28 ${inputClass}`} />
-        <input value={deadline} onChange={(e) => setDeadline(e.target.value)} type="date" className={`w-36 ${inputClass}`} />
-        <button type="submit" title="Add goal" className={buttonIconPrimaryClass}>
-          <Plus size={16} />
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold text-surface-100">Savings goals</h3>
+        <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+          <Plus size={14} /> Add
         </button>
-      </form>
+      </div>
 
       <div className="space-y-3">
         {savingsGoals.length === 0 && <EmptyState icon={PiggyBank} label="No savings goals yet." />}
@@ -80,6 +79,17 @@ export default function Savings() {
           </div>
         ))}
       </div>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add savings goal">
+        <form onSubmit={submit} className="space-y-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Goal name" className={`w-full ${inputClass}`} />
+          <input value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="Target amount" type="number" className={`w-full ${inputClass}`} />
+          <input value={deadline} onChange={(e) => setDeadline(e.target.value)} type="date" className={`w-full ${inputClass}`} />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add goal
+          </button>
+        </form>
+      </Drawer>
     </Card>
   );
 }

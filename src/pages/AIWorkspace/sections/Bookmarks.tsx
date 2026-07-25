@@ -1,11 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { ExternalLink, X, Plus, Bookmark } from 'lucide-react';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
-import { inputClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useAiWorkspaceStore } from '@/store/aiWorkspaceStore';
 
 export default function Bookmarks() {
   const { bookmarks, addBookmark, removeBookmark } = useAiWorkspaceStore();
+  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [notes, setNotes] = useState('');
@@ -21,14 +23,11 @@ export default function Bookmarks() {
 
   return (
     <div>
-      <form onSubmit={submit} className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="URL" className={`min-w-0 flex-1 basis-40 ${inputClass}`} />
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-        <button type="submit" title="Add bookmark" className={buttonIconPrimaryClass}>
-          <Plus size={16} />
+      <div className="mb-4 flex justify-end">
+        <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+          <Plus size={14} /> Add bookmark
         </button>
-      </form>
+      </div>
 
       <div className="space-y-1">
         {bookmarks.length === 0 && <EmptyState icon={Bookmark} label="No AI bookmarks yet." />}
@@ -47,6 +46,17 @@ export default function Bookmarks() {
           </div>
         ))}
       </div>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add bookmark">
+        <form onSubmit={submit} className="space-y-3">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={`w-full ${inputClass}`} />
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="URL" className={`w-full ${inputClass}`} />
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" className={`w-full ${inputClass}`} />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add bookmark
+          </button>
+        </form>
+      </Drawer>
     </div>
   );
 }

@@ -1,13 +1,15 @@
 import { FormEvent, useState } from 'react';
 import { Plus, Receipt, X } from 'lucide-react';
 import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
-import { inputClass, buttonIconPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useMoneyStore } from '@/store/moneyStore';
 import { formatCurrency } from '@/utils/money';
 
 export default function Bills() {
   const { bills, addBill, toggleBillPaid, removeBill } = useMoneyStore();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDay, setDueDay] = useState('1');
@@ -24,15 +26,12 @@ export default function Bills() {
 
   return (
     <Card>
-      <h3 className="mb-3 text-[13px] font-semibold text-surface-100">Bill reminders</h3>
-      <form onSubmit={submit} className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bill name" className={`min-w-0 flex-1 basis-40 ${inputClass}`} />
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" type="number" className={`w-28 ${inputClass}`} />
-        <input value={dueDay} onChange={(e) => setDueDay(e.target.value)} placeholder="Day" type="number" min={1} max={31} className={`w-20 ${inputClass}`} />
-        <button type="submit" title="Add bill" className={buttonIconPrimaryClass}>
-          <Plus size={16} />
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold text-surface-100">Bill reminders</h3>
+        <button onClick={() => setOpen(true)} className={buttonPrimaryClass}>
+          <Plus size={14} /> Add
         </button>
-      </form>
+      </div>
       <ul className="space-y-1 text-[13px]">
         {bills.length === 0 && <EmptyState icon={Receipt} label="No bills yet — add one above." />}
         {bills.map((b) => (
@@ -51,6 +50,17 @@ export default function Bills() {
           </li>
         ))}
       </ul>
+
+      <Drawer open={open} onClose={() => setOpen(false)} title="Add bill">
+        <form onSubmit={submit} className="space-y-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bill name" className={`w-full ${inputClass}`} />
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" type="number" className={`w-full ${inputClass}`} />
+          <input value={dueDay} onChange={(e) => setDueDay(e.target.value)} placeholder="Due day" type="number" min={1} max={31} className={`w-full ${inputClass}`} />
+          <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+            <Plus size={14} /> Add bill
+          </button>
+        </form>
+      </Drawer>
     </Card>
   );
 }

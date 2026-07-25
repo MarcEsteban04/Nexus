@@ -2,8 +2,9 @@ import { FormEvent, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, Plus, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Card from '@/components/Card';
+import Drawer from '@/components/Drawer';
 import EmptyState from '@/components/EmptyState';
-import { inputClass, buttonIconPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useCalendarStore } from '@/store/calendarStore';
 import { formatDateKey, getMonthGrid } from '@/utils/calendar';
 
@@ -25,12 +26,12 @@ function AddEventForm({ date }: { date: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className={`min-w-0 flex-1 basis-32 ${inputClass}`} />
-      <input value={time} onChange={(e) => setTime(e.target.value)} type="time" className={`w-28 ${inputClass}`} />
-      <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-32 ${inputClass}`} />
-      <button type="submit" title="Add event" className={buttonIconPrimaryClass}>
-        <Plus size={16} />
+    <form onSubmit={submit} className="space-y-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className={`w-full ${inputClass}`} />
+      <input value={time} onChange={(e) => setTime(e.target.value)} type="time" className={`w-full ${inputClass}`} />
+      <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" className={`w-full ${inputClass}`} />
+      <button type="submit" className={`w-full ${buttonPrimaryClass}`}>
+        <Plus size={14} /> Add event
       </button>
     </form>
   );
@@ -41,6 +42,7 @@ export default function Calendar() {
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState(formatDateKey(today));
+  const [addOpen, setAddOpen] = useState(false);
 
   const grid = useMemo(() => getMonthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
   const todayKey = formatDateKey(today);
@@ -132,9 +134,11 @@ export default function Calendar() {
 
           <div className="space-y-4">
             <Card>
-              <h3 className="mb-3 text-[13px] font-semibold text-surface-100">{selected}</h3>
-              <div className="mb-3">
-                <AddEventForm date={selected} />
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-surface-100">{selected}</h3>
+                <button onClick={() => setAddOpen(true)} className={buttonPrimaryClass}>
+                  <Plus size={13} /> Add event
+                </button>
               </div>
               <div className="space-y-1">
                 {selectedEvents.length === 0 ? (
@@ -174,6 +178,10 @@ export default function Calendar() {
           </div>
         </div>
       </div>
+
+      <Drawer open={addOpen} onClose={() => setAddOpen(false)} title="Add event" subtitle={selected}>
+        <AddEventForm date={selected} />
+      </Drawer>
     </div>
   );
 }
