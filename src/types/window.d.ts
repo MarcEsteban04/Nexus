@@ -21,6 +21,10 @@ declare global {
       ) => Promise<{ error: string | null; tracked: boolean }>;
       onGameSessionEnded: (cb: (payload: { gameId: string; hours: number }) => void) => () => void;
       scanReceiptImage: (imageDataUrl: string) => Promise<{ result: ScannedReceipt | null; error: string | null }>;
+      askAssistant: (
+        messages: { role: 'user' | 'assistant'; content: string }[],
+        context: string,
+      ) => Promise<{ reply: string | null; error: string | null }>;
     };
   }
 }

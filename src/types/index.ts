@@ -133,35 +133,6 @@ export interface DetectedShortcut {
   icon: string | null;
 }
 
-export type AiModel = 'ChatGPT' | 'Claude' | 'Gemini' | 'DeepSeek' | 'Ollama' | 'Other';
-
-export interface Prompt {
-  id: string;
-  title: string;
-  body: string;
-  category: string;
-  model: AiModel;
-  favorite: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Snippet {
-  id: string;
-  title: string;
-  language: string;
-  code: string;
-  createdAt: string;
-}
-
-export interface AiBookmark {
-  id: string;
-  title: string;
-  url: string;
-  notes: string;
-  createdAt: string;
-}
-
 export interface Receipt {
   id: string;
   store: string;

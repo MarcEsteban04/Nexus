@@ -22,4 +22,6 @@ contextBridge.exposeInMainWorld('nexus', {
     return () => ipcRenderer.removeListener('games:session-ended', listener);
   },
   scanReceiptImage: (imageDataUrl: string) => ipcRenderer.invoke('receipts:scan', { imageDataUrl }),
+  askAssistant: (messages: { role: 'user' | 'assistant'; content: string }[], context: string) =>
+    ipcRenderer.invoke('assistant:ask', { messages, context }),
 });

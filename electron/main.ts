@@ -251,6 +251,59 @@ ipcMain.handle(
   },
 );
 
+interface AssistantChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+ipcMain.handle(
+  'assistant:ask',
+  async (
+    _event,
+    { messages, context }: { messages: AssistantChatMessage[]; context: string },
+  ): Promise<{ reply: string | null; error: string | null }> => {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return { reply: null, error: 'No OPENAI_API_KEY found in .env.local.' };
+    if (!messages.length) return { reply: null, error: 'Ask something first.' };
+
+    try {
+      const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                "You are Nexus AI, built into the user's offline-first personal desktop app. Below is a snapshot of their app data — Money Manager, Calendar, Gaming, Receipt Vault, and Shopping wishlist. Their Password Vault is intentionally never included here for privacy. Answer questions about their data directly and concisely, doing any math yourself (totals, comparisons, date logic). If something isn't in the snapshot, say so plainly instead of guessing or inventing data. Keep currency symbols exactly as given (₱ for PHP, $ for USD).\n\n" +
+                context,
+            },
+            ...messages,
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        return { reply: null, error: `OpenAI request failed (${res.status}): ${body.slice(0, 200)}` };
+      }
+
+      const data = await res.json();
+      const content: string = data?.choices?.[0]?.message?.content ?? '';
+      return content ? { reply: content, error: null } : { reply: null, error: 'Empty response from the model.' };
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { reply: null, error: 'OpenAI request timed out after 45s. Check your connection and try again.' };
+      }
+      return { reply: null, error: err instanceof Error ? err.message : 'Unknown error contacting OpenAI.' };
+    }
+  },
+);
+
 interface DetectedShortcut {
   name: string;
   path: string;
