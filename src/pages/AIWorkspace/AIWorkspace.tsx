@@ -1,55 +1,157 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Sparkles, Send, Trash2, AlertCircle } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Sparkles, Send, Trash2, AlertCircle, Mic, MicOff } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Card from '@/components/Card';
 import EmptyState from '@/components/EmptyState';
-import { inputClass, buttonPrimaryClass, buttonGhostIconClass } from '@/components/ui';
+import Select from '@/components/Select';
+import { inputClass, buttonPrimaryClass, buttonSecondaryClass, buttonGhostIconClass } from '@/components/ui';
 import { useAiAssistantStore } from '@/store/aiAssistantStore';
-import { buildAssistantContext } from '@/utils/assistantContext';
+import { buildAssistantContext, buildDailyDigest, ContextDomain, CONTEXT_DOMAIN_LABELS } from '@/utils/assistantContext';
+import { renderMarkdownLite } from '@/utils/markdownLite';
+import { ASSISTANT_TOOLS, executeToolCall, parseToolCall, ParsedToolCall, ToolCallRequest } from '@/utils/assistantTools';
+import { formatDateKey } from '@/utils/calendar';
+import { createId } from '@/utils/id';
+
+const PROVIDER_OPTIONS = [
+  { value: 'openai', label: 'OpenAI (GPT-4o mini)' },
+  { value: 'groq', label: 'Groq (Llama 3.3 70B)' },
+];
 
 const SUGGESTIONS = [
   'How much do I have across all my accounts?',
   "What bills do I still need to pay this month?",
   "What's on my calendar this week?",
-  'How much am I spending on subscriptions monthly?',
+  'Log a ₱200 expense for coffee',
 ];
 
+const DOMAIN_KEYS = Object.keys(CONTEXT_DOMAIN_LABELS) as ContextDomain[];
+
+const THINKING_PHRASES = [
+  'Thinking',
+  'Digging through your data',
+  'Crunching the numbers',
+  'Piecing it together',
+  'Double-checking the details',
+];
+
+function ThinkingIndicator() {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setIndex((i) => (i + 1) % THINKING_PHRASES.length), 1600);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-surface-500">
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={index}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+        >
+          {THINKING_PHRASES[index]}
+        </motion.span>
+      </AnimatePresence>
+      <span className="flex items-center gap-0.5">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="h-1 w-1 rounded-full bg-surface-500"
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
+          />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 export default function AIWorkspace() {
-  const { messages, addMessage, clearMessages } = useAiAssistantStore();
+  const { messages, provider, enabledDomains, lastDigestDate, addMessage, clearMessages, setProvider, toggleDomain, setLastDigestDate } =
+    useAiAssistantStore();
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [pendingToolCall, setPendingToolCall] = useState<ParsedToolCall | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, loading]);
+  }, [messages, streaming, streamingText, pendingToolCall]);
+
+  useEffect(() => {
+    const todayKey = formatDateKey(new Date());
+    if (lastDigestDate === todayKey) return;
+    const digest = buildDailyDigest();
+    if (digest) addMessage('assistant', digest);
+    setLastDigestDate(todayKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function ask(question: string) {
     const trimmed = question.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || streaming) return;
     setError(null);
     addMessage('user', trimmed);
     setInput('');
-    setLoading(true);
-
-    const history = [...useAiAssistantStore.getState().messages].map((m) => ({ role: m.role, content: m.content }));
-    const context = buildAssistantContext();
 
     if (!window.nexus) {
-      setError('Assistant is only available in the desktop app.');
-      setLoading(false);
+      setError('The assistant is only available in the desktop app.');
       return;
     }
 
-    const { reply, error: err } = await window.nexus.askAssistant(history, context);
-    if (err || !reply) {
-      setError(err ?? 'No response from the assistant.');
-      setLoading(false);
-      return;
-    }
-    addMessage('assistant', reply);
-    setLoading(false);
+    const history = useAiAssistantStore.getState().messages.map((m) => ({ role: m.role, content: m.content }));
+    const context = buildAssistantContext(enabledDomains);
+    const requestId = createId();
+
+    setStreaming(true);
+    setStreamingText('');
+
+    const offChunk = window.nexus.onAssistantStreamChunk((payload) => {
+      if (payload.requestId !== requestId) return;
+      setStreamingText((prev) => prev + payload.delta);
+    });
+
+    const offDone = window.nexus.onAssistantStreamDone((payload) => {
+      if (payload.requestId !== requestId) return;
+      offChunk();
+      offDone();
+      setStreaming(false);
+      setStreamingText('');
+
+      if (payload.error) {
+        setError(payload.error);
+        return;
+      }
+      if (payload.content) {
+        addMessage('assistant', payload.content);
+      }
+      if (payload.toolCalls && payload.toolCalls.length) {
+        const parsed = parseToolCall(payload.toolCalls[0] as ToolCallRequest);
+        if (parsed) setPendingToolCall(parsed);
+      }
+    });
+
+    window.nexus.askAssistantStream(requestId, history, context, provider, ASSISTANT_TOOLS);
+  }
+
+  function confirmToolCall() {
+    if (!pendingToolCall) return;
+    const summary = executeToolCall(pendingToolCall);
+    addMessage('assistant', summary);
+    setPendingToolCall(null);
+  }
+
+  function cancelToolCall() {
+    if (!pendingToolCall) return;
+    addMessage('assistant', "Okay, I won't do that.");
+    setPendingToolCall(null);
   }
 
   function submit(e: FormEvent) {
@@ -57,18 +159,71 @@ export default function AIWorkspace() {
     ask(input);
   }
 
+  function startVoiceInput() {
+    const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      setError('Voice input is not supported in this build.');
+      return;
+    }
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (e: any) => {
+      const transcript = e.results?.[0]?.[0]?.transcript ?? '';
+      if (transcript) setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onerror = () => setRecording(false);
+    recognition.onend = () => setRecording(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setRecording(true);
+  }
+
+  function stopVoiceInput() {
+    recognitionRef.current?.stop();
+    setRecording(false);
+  }
+
   return (
     <div>
-      <PageHeader title="Nexus AI" subtitle="Knows your app data. Never sees your Password Vault." />
+      <PageHeader
+        title="Nexus AI"
+        subtitle="Knows your app data. Never sees your Password Vault."
+        actions={
+          <Select
+            value={provider}
+            onChange={(v) => setProvider(v as 'openai' | 'groq')}
+            options={PROVIDER_OPTIONS}
+            className="w-48"
+          />
+        }
+      />
       <div className="p-8">
         <Card className="flex h-[calc(100vh-14rem)] flex-col">
-          {messages.length > 0 && (
-            <div className="mb-3 flex items-center justify-end">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-surface-500">Context:</span>
+              {DOMAIN_KEYS.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => toggleDomain(d)}
+                  className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                    enabledDomains[d]
+                      ? 'border-accent-500/50 bg-accent-500/15 text-accent-300'
+                      : 'border-surface-800 text-surface-500 hover:text-surface-300'
+                  }`}
+                >
+                  {CONTEXT_DOMAIN_LABELS[d]}
+                </button>
+              ))}
+            </div>
+            {messages.length > 0 && (
               <button onClick={() => clearMessages()} className={buttonGhostIconClass}>
                 <Trash2 size={14} />
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto pr-1">
             {messages.length === 0 ? (
@@ -90,21 +245,38 @@ export default function AIWorkspace() {
               messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                    className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
                       m.role === 'user'
-                        ? 'bg-accent-gradient text-white shadow-glow'
+                        ? 'whitespace-pre-wrap bg-accent-gradient text-white shadow-glow'
                         : 'border border-surface-800 bg-surface-850 text-surface-200'
                     }`}
                   >
-                    {m.content}
+                    {m.role === 'assistant' ? renderMarkdownLite(m.content) : m.content}
                   </div>
                 </div>
               ))
             )}
-            {loading && (
+
+            {streaming && (
               <div className="flex justify-start">
-                <div className="rounded-2xl border border-surface-800 bg-surface-850 px-3.5 py-2.5 text-[13px] text-surface-500">
-                  Thinking…
+                <div className="max-w-[80%] rounded-2xl border border-surface-800 bg-surface-850 px-3.5 py-2.5 text-[13px] text-surface-200">
+                  {streamingText ? renderMarkdownLite(streamingText) : <ThinkingIndicator />}
+                </div>
+              </div>
+            )}
+
+            {pendingToolCall && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-2xl border border-accent-500/40 bg-accent-500/10 px-3.5 py-3 text-[13px] text-surface-200">
+                  <p className="mb-2.5">{pendingToolCall.description}</p>
+                  <div className="flex gap-2">
+                    <button onClick={confirmToolCall} className={buttonPrimaryClass}>
+                      Confirm
+                    </button>
+                    <button onClick={cancelToolCall} className={buttonSecondaryClass}>
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -124,7 +296,14 @@ export default function AIWorkspace() {
               placeholder="Ask about your money, calendar, games, receipts, wishlist…"
               className={`flex-1 ${inputClass}`}
             />
-            <button type="submit" disabled={loading || !input.trim()} className={`${buttonPrimaryClass} disabled:opacity-40`}>
+            <button
+              type="button"
+              onClick={recording ? stopVoiceInput : startVoiceInput}
+              className={`${buttonGhostIconClass} ${recording ? 'text-rose-400' : ''}`}
+            >
+              {recording ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+            <button type="submit" disabled={streaming || !input.trim()} className={`${buttonPrimaryClass} disabled:opacity-40`}>
               <Send size={14} />
             </button>
           </form>

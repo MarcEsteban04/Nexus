@@ -22,6 +22,26 @@ contextBridge.exposeInMainWorld('nexus', {
     return () => ipcRenderer.removeListener('games:session-ended', listener);
   },
   scanReceiptImage: (imageDataUrl: string) => ipcRenderer.invoke('receipts:scan', { imageDataUrl }),
-  askAssistant: (messages: { role: 'user' | 'assistant'; content: string }[], context: string) =>
-    ipcRenderer.invoke('assistant:ask', { messages, context }),
+  askAssistantStream: (
+    requestId: string,
+    messages: { role: 'user' | 'assistant'; content: string }[],
+    context: string,
+    provider: 'openai' | 'groq',
+    tools?: unknown[],
+  ) => ipcRenderer.send('assistant:ask-stream', { requestId, messages, context, provider, tools }),
+  onAssistantStreamChunk: (cb: (payload: { requestId: string; delta: string }) => void) => {
+    const listener = (_: unknown, payload: { requestId: string; delta: string }) => cb(payload);
+    ipcRenderer.on('assistant:stream-chunk', listener);
+    return () => ipcRenderer.removeListener('assistant:stream-chunk', listener);
+  },
+  onAssistantStreamDone: (
+    cb: (payload: { requestId: string; content: string; toolCalls: { id: string; name: string; arguments: string }[] | null; error: string | null }) => void,
+  ) => {
+    const listener = (
+      _: unknown,
+      payload: { requestId: string; content: string; toolCalls: { id: string; name: string; arguments: string }[] | null; error: string | null },
+    ) => cb(payload);
+    ipcRenderer.on('assistant:stream-done', listener);
+    return () => ipcRenderer.removeListener('assistant:stream-done', listener);
+  },
 });

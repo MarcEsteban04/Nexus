@@ -256,53 +256,128 @@ interface AssistantChatMessage {
   content: string;
 }
 
-ipcMain.handle(
-  'assistant:ask',
-  async (
-    _event,
-    { messages, context }: { messages: AssistantChatMessage[]; context: string },
-  ): Promise<{ reply: string | null; error: string | null }> => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { reply: null, error: 'No OPENAI_API_KEY found in .env.local.' };
-    if (!messages.length) return { reply: null, error: 'Ask something first.' };
+type AssistantProvider = 'openai' | 'groq';
 
-    try {
-      const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+const ASSISTANT_PROVIDERS: Record<
+  AssistantProvider,
+  { envKey: string; endpoint: string; model: string; label: string }
+> = {
+  openai: {
+    envKey: 'OPENAI_API_KEY',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o-mini',
+    label: 'OpenAI',
+  },
+  groq: {
+    envKey: 'GROK_API_KEY',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile',
+    label: 'Groq',
+  },
+};
+
+const ASSISTANT_SYSTEM_PROMPT =
+  "You are Nexus AI, a warm, witty personal assistant built into the user's offline-first desktop app. Below is a snapshot of their app data. Their Password Vault is intentionally never included here for privacy.\n\n" +
+  "Personality: talk like a sharp, friendly assistant who actually knows this person's life, not a dry report generator. Be conversational and a little lively — light humor, genuine reactions (\"nice, that's a solid balance\" / \"heads up, that bill's due soon\"), and a bit of personality are welcome. Never sound robotic or like a form letter.\n\n" +
+  "Depth: don't just answer the literal question — go a layer deeper. Surface relevant context the user didn't explicitly ask for but would want (e.g. if asked about spending, mention what's driving it or what's coming up; if asked about balance, note anything notable like a bill due soon or a low account). Break down numbers instead of just stating a total — show the pieces that make it up when it's useful. Proactively flag anything that looks off, urgent, or noteworthy in the data (unpaid bills close to due, a debt with high interest, an upcoming event clash), but only when it's genuinely relevant to what was asked.\n\n" +
+  "Formatting: use markdown — headers, bullet points, bold for key numbers — so longer answers are easy to scan rather than one dense paragraph. Keep short factual questions short; expand when the question or the data calls for it.\n\n" +
+  "Actions: you have functions available to create an account, log a transaction, add a calendar event, mark a bill paid, or add a wishlist item — the user will confirm before anything is actually executed, so it's safe to propose one when they clearly ask you to. Call a function ONLY when the user's message is an imperative request to create/change something (\"add\", \"log\", \"create\", \"mark ... paid\", \"remind me to\", etc.) — never for a question about existing data (\"how many\", \"what's\", \"how much\", \"do I have\", \"is there\"), even right after a previous action. If the user asks a question, always just answer it in text from the snapshot below and do not call any function, even if a recent turn involved an action. If a request doesn't match any available function (e.g. editing or deleting something), say so instead of forcing it into the closest tool.\n\n" +
+  "Accuracy: do all math yourself (totals, comparisons, date logic) using only the real numbers in the snapshot below. If a data domain isn't in the snapshot (it may have been turned off, or genuinely has nothing in it), say so plainly instead of guessing or inventing data. Keep currency symbols exactly as given (₱ for PHP, $ for USD).\n\n";
+
+interface StreamRequest {
+  requestId: string;
+  messages: AssistantChatMessage[];
+  context: string;
+  provider: AssistantProvider;
+  tools?: unknown[];
+}
+
+ipcMain.on('assistant:ask-stream', async (event, { requestId, messages, context, provider, tools }: StreamRequest) => {
+  const send = (payload: Record<string, unknown>) => {
+    if (!event.sender.isDestroyed()) event.sender.send('assistant:stream-chunk', { requestId, ...payload });
+  };
+  const finish = (payload: { content: string; toolCalls: unknown[] | null; error: string | null }) => {
+    if (!event.sender.isDestroyed()) event.sender.send('assistant:stream-done', { requestId, ...payload });
+  };
+
+  const config = ASSISTANT_PROVIDERS[provider] ?? ASSISTANT_PROVIDERS.openai;
+  const apiKey = process.env[config.envKey];
+  if (!apiKey) return finish({ content: '', toolCalls: null, error: `No ${config.envKey} found in .env.local.` });
+  if (!messages.length) return finish({ content: '', toolCalls: null, error: 'Ask something first.' });
+
+  try {
+    const res = await fetchWithTimeout(
+      config.endpoint,
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content:
-                "You are Nexus AI, built into the user's offline-first personal desktop app. Below is a snapshot of their app data — Money Manager, Calendar, Gaming, Receipt Vault, and Shopping wishlist. Their Password Vault is intentionally never included here for privacy. Answer questions about their data directly and concisely, doing any math yourself (totals, comparisons, date logic). If something isn't in the snapshot, say so plainly instead of guessing or inventing data. Keep currency symbols exactly as given (₱ for PHP, $ for USD).\n\n" +
-                context,
-            },
-            ...messages,
-          ],
+          model: config.model,
+          stream: true,
+          messages: [{ role: 'system', content: ASSISTANT_SYSTEM_PROMPT + context }, ...messages],
+          ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
         }),
-      });
+      },
+      120_000,
+    );
 
-      if (!res.ok) {
-        const body = await res.text();
-        return { reply: null, error: `OpenAI request failed (${res.status}): ${body.slice(0, 200)}` };
-      }
-
-      const data = await res.json();
-      const content: string = data?.choices?.[0]?.message?.content ?? '';
-      return content ? { reply: content, error: null } : { reply: null, error: 'Empty response from the model.' };
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return { reply: null, error: 'OpenAI request timed out after 45s. Check your connection and try again.' };
-      }
-      return { reply: null, error: err instanceof Error ? err.message : 'Unknown error contacting OpenAI.' };
+    if (!res.ok || !res.body) {
+      const body = res.body ? await res.text() : '';
+      return finish({ content: '', toolCalls: null, error: `${config.label} request failed (${res.status}): ${body.slice(0, 200)}` });
     }
-  },
-);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let content = '';
+    const toolCallsAcc: Record<number, { id: string; name: string; arguments: string }> = {};
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const dataStr = trimmed.slice(5).trim();
+        if (dataStr === '[DONE]') continue;
+        try {
+          const json = JSON.parse(dataStr);
+          const delta = json?.choices?.[0]?.delta;
+          if (typeof delta?.content === 'string' && delta.content) {
+            content += delta.content;
+            send({ delta: delta.content });
+          }
+          if (Array.isArray(delta?.tool_calls)) {
+            for (const tc of delta.tool_calls) {
+              const idx = typeof tc.index === 'number' ? tc.index : 0;
+              if (!toolCallsAcc[idx]) toolCallsAcc[idx] = { id: '', name: '', arguments: '' };
+              if (tc.id) toolCallsAcc[idx].id = tc.id;
+              if (tc.function?.name) toolCallsAcc[idx].name += tc.function.name;
+              if (tc.function?.arguments) toolCallsAcc[idx].arguments += tc.function.arguments;
+            }
+          }
+        } catch {
+          // ignore malformed SSE chunk
+        }
+      }
+    }
+
+    const toolCalls = Object.values(toolCallsAcc);
+    finish({ content, toolCalls: toolCalls.length ? toolCalls : null, error: null });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return finish({ content: '', toolCalls: null, error: `${config.label} request timed out. Check your connection and try again.` });
+    }
+    finish({ content: '', toolCalls: null, error: err instanceof Error ? err.message : `Unknown error contacting ${config.label}.` });
+  }
+});
 
 interface DetectedShortcut {
   name: string;

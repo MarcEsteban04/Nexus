@@ -21,10 +21,22 @@ declare global {
       ) => Promise<{ error: string | null; tracked: boolean }>;
       onGameSessionEnded: (cb: (payload: { gameId: string; hours: number }) => void) => () => void;
       scanReceiptImage: (imageDataUrl: string) => Promise<{ result: ScannedReceipt | null; error: string | null }>;
-      askAssistant: (
+      askAssistantStream: (
+        requestId: string,
         messages: { role: 'user' | 'assistant'; content: string }[],
         context: string,
-      ) => Promise<{ reply: string | null; error: string | null }>;
+        provider: 'openai' | 'groq',
+        tools?: unknown[],
+      ) => void;
+      onAssistantStreamChunk: (cb: (payload: { requestId: string; delta: string }) => void) => () => void;
+      onAssistantStreamDone: (
+        cb: (payload: {
+          requestId: string;
+          content: string;
+          toolCalls: { id: string; name: string; arguments: string }[] | null;
+          error: string | null;
+        }) => void,
+      ) => () => void;
     };
   }
 }
