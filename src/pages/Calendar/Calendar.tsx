@@ -192,35 +192,46 @@ export default function Calendar() {
 
   const selectedEvents = (eventsByDateView.get(selected) ?? []).sort((a, b) => a.time.localeCompare(b.time));
 
+  const nowTimeStr = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+
   const upcoming = upcomingItems
-    .filter((e) => e.date >= todayKey)
+    .filter((e) => e.date > todayKey || (e.date === todayKey && (!e.time || e.time >= nowTimeStr)))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
     .slice(0, 8);
 
+  const upcomingGroups = useMemo(() => {
+    const groups: { date: string; items: DisplayItem[] }[] = [];
+    for (const item of upcoming) {
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.date === item.date) {
+        lastGroup.items.push(item);
+      } else {
+        groups.push({ date: item.date, items: [item] });
+      }
+    }
+    return groups;
+  }, [upcoming]);
+
   function renderEventRow(item: DisplayItem) {
     const palette = categoryPalette(item.category);
-    const SourceIcon = item.source === 'event' ? null : MONEY_SOURCE_META[item.source].icon;
+    const SourceIcon = item.source === 'event' ? Clock : MONEY_SOURCE_META[item.source].icon;
     return (
       <div
         key={item.key}
-        className={`group flex items-center justify-between gap-2 rounded-lg border-l-2 bg-surface-800/40 py-1.5 pl-2.5 pr-1.5 ${palette.border}`}
+        className="group flex items-start gap-2.5 rounded-xl bg-surface-800/40 p-2.5 transition-colors hover:bg-surface-800/70"
       >
+        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${palette.badge}`}>
+          <SourceIcon size={14} />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 truncate text-[13px] text-surface-200">
-            {SourceIcon && <SourceIcon size={12} className="shrink-0 text-surface-500" />}
-            <span className="truncate">{item.title}</span>
-          </div>
-          <div className="mt-0.5 flex items-center gap-2">
+          <div className="truncate text-[13px] font-medium text-surface-200">{item.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             {item.time && (
               <span className="flex items-center gap-1 text-[11px] text-surface-500">
                 <Clock size={10} /> {formatTime(item.time)}
               </span>
             )}
-            {item.reminderMinutes != null && (
-              <span className="flex items-center gap-1 text-[11px] text-surface-500">
-                <BellRing size={10} />
-              </span>
-            )}
+            {item.reminderMinutes != null && <BellRing size={11} className="text-surface-500" />}
             {item.category && (
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${palette.badge}`}>{item.category}</span>
             )}
@@ -346,7 +357,7 @@ export default function Calendar() {
                     const inMonth = date.getMonth() === cursor.getMonth();
                     const isToday = key === todayKey;
                     const isSelected = key === selected;
-                    const dayEvents = eventsByDateMonth.get(key) ?? [];
+                    const dayEvents = inMonth ? (eventsByDateMonth.get(key) ?? []) : [];
                     const dotEvents = dayEvents.slice(0, 3);
                     return (
                       <button
@@ -356,7 +367,7 @@ export default function Calendar() {
                           isSelected
                             ? 'bg-accent-gradient text-white shadow-glow'
                             : inMonth
-                              ? 'text-surface-200 hover:bg-surface-800'
+                              ? `text-surface-200 hover:bg-surface-800 ${dayEvents.length > 0 ? 'bg-surface-800/40' : ''}`
                               : 'text-surface-600 hover:bg-surface-800/50'
                         } ${isToday && !isSelected ? 'ring-1 ring-accent-500/60' : ''}`}
                       >
@@ -461,22 +472,30 @@ export default function Calendar() {
               {upcoming.length === 0 ? (
                 <EmptyState icon={CalendarDays} label="Nothing upcoming." />
               ) : (
-                <div className="space-y-1.5">
-                  {upcoming.map((item) => {
-                    const palette = categoryPalette(item.category);
-                    const SourceIcon = item.source === 'event' ? null : MONEY_SOURCE_META[item.source].icon;
-                    return (
-                      <div key={item.key} className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-surface-800/40">
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palette.dot}`} />
-                        {SourceIcon && <SourceIcon size={11} className="shrink-0 text-surface-500" />}
-                        <span className="min-w-0 flex-1 truncate text-[13px] text-surface-200">{item.title}</span>
-                        <span className="shrink-0 whitespace-nowrap text-[11px] text-surface-500">
-                          {formatFriendlyDate(item.date)}
-                          {item.time && ` · ${formatTime(item.time)}`}
-                        </span>
+                <div className="space-y-3">
+                  {upcomingGroups.map((group) => (
+                    <div key={group.date}>
+                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-surface-500">
+                        {formatFriendlyDate(group.date)}
+                      </p>
+                      <div className="space-y-1">
+                        {group.items.map((item) => {
+                          const palette = categoryPalette(item.category);
+                          const SourceIcon = item.source === 'event' ? null : MONEY_SOURCE_META[item.source].icon;
+                          return (
+                            <div key={item.key} className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-surface-800/40">
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palette.dot}`} />
+                              {SourceIcon && <SourceIcon size={11} className="shrink-0 text-surface-500" />}
+                              <span className="min-w-0 flex-1 truncate text-[13px] text-surface-200">{item.title}</span>
+                              {item.time && (
+                                <span className="shrink-0 whitespace-nowrap text-[11px] text-surface-500">{formatTime(item.time)}</span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>
