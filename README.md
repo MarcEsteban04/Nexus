@@ -10,10 +10,13 @@ Nexus is an offline-first Windows desktop app (Electron + React + TypeScript + V
 - **UI:** React 18 + TypeScript + Vite + Tailwind CSS + Framer Motion
 - **State:** Zustand, with `persist` middleware (localStorage-backed, offline-first)
 - **Routing:** React Router
-- **AI features:** OpenAI API (`gpt-4o-mini`, `gpt-4o-search-preview`) called only from the Electron main process — the API key never reaches the renderer
+- **AI features:** OpenAI API (`gpt-4o-mini`, `gpt-4o-search-preview`) and, for Nexus AI, a choice of OpenAI or Groq (`llama-3.3-70b-versatile`, via Groq's OpenAI-compatible endpoint) — all calls happen only from the Electron main process, so no API key ever reaches the renderer
 - **Security:** AES-256-GCM + PBKDF2 (250k iterations) via the native Web Crypto API for the Password Vault
 
 ## Modules
+
+### 📊 Dashboard
+A cross-module home base, not just a Money summary: quick-action shortcuts (Add transaction, Add event, Add wishlist item, Ask Nexus AI), income/expense/savings/recurring-income/bills/debt stats, next 5 upcoming calendar events, last 5 transactions, your furthest-along savings goal, the currently-/most-recently-played game, your wishlist, and bills due.
 
 ### 💰 Money Manager
 - **Overview** — at-a-glance stats: total balance, income/expenses this month, net savings, debt, unpaid bills, subscription cost, and recurring income.
@@ -36,8 +39,12 @@ AI-powered price search across the web for a product, plus a wishlist.
 ### 🎮 Gaming Dashboard
 Auto-detects installed games and shortcuts on your desktop (including Steam `.url` shortcuts), extracts their icons, launches them, and automatically tracks playtime by watching the game process until it exits.
 
-### 🤖 AI Workspace
-A workspace for prompts, code snippets, and bookmarks across ChatGPT, Claude, Gemini, DeepSeek, Ollama, and others.
+### ✨ Nexus AI
+A chat assistant that actually knows your data — not a lookup tool bolted onto the app, but built directly on top of it:
+- Answers questions about your Money Manager, Calendar, Gaming, Receipt Vault, and Shopping wishlist data (never your Password Vault, by design). Per-message toggles let you control which of those domains get included in a given question.
+- Switch between OpenAI and Groq from a header dropdown; replies stream in token-by-token.
+- Can take action — create an account, log a transaction, add a calendar event, mark a bill paid, or add a wishlist item — but only ever after you approve a plain-language confirmation card. Nothing executes silently.
+- Voice input via the browser's speech recognition, and a once-a-day, no-AI-call digest of bills/subscriptions due soon and today's events, posted automatically when you open the page.
 
 ### 📅 Calendar
 - Add events with a title, time, category, recurrence (none/daily/weekly/monthly/yearly), and an optional reminder.
@@ -57,10 +64,11 @@ npm install
 npm run electron:dev   # runs Vite + Electron together in dev mode with hot reload
 ```
 
-To create AI-powered features (receipt scanning, price search, credential import), add an OpenAI API key to a local `.env.local` file (gitignored):
+To use the AI-powered features (receipt scanning, price search, credential import, Nexus AI), add API key(s) to a local `.env.local` file (gitignored):
 
 ```
 OPENAI_API_KEY=sk-...
+GROK_API_KEY=gsk_...   # optional — a Groq key, for the Groq option in Nexus AI
 ```
 
 ### Building a release
@@ -77,7 +85,7 @@ Produces a Windows installer (NSIS) and portable executable in `release/`.
 electron/         Electron main process + preload script (IPC bridges)
 src/
   components/      Shared UI components (Modal, Drawer, Select, Card, etc.)
-  hooks/           Shared hooks (linked transactions, event reminders)
+  hooks/           Shared hooks (linked transactions, calendar event reminders)
   pages/           One folder per module (Money, Calendar, Vault, Shopping, Gaming, ...)
   store/           Zustand stores, persisted to localStorage
   types/           Shared TypeScript types
