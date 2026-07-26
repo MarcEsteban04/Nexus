@@ -21,6 +21,9 @@ declare global {
       ) => Promise<{ error: string | null; tracked: boolean }>;
       onGameSessionEnded: (cb: (payload: { gameId: string; hours: number }) => void) => () => void;
       scanReceiptImage: (imageDataUrl: string) => Promise<{ result: ScannedReceipt | null; error: string | null }>;
+      pickApp: () => Promise<{ path: string; name: string; icon: string | null } | null>;
+      scanInstalledApps: () => Promise<{ results: { name: string; path: string; icon: string | null }[]; error: string | null }>;
+      launchApps: (paths: string[]) => Promise<{ errors: string[] }>;
       askAssistantStream: (
         requestId: string,
         messages: { role: 'user' | 'assistant'; content: string }[],

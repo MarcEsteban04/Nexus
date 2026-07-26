@@ -1,8 +1,8 @@
-import { app, BrowserWindow, shell, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, nativeImage, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execFile, ChildProcess } from 'child_process';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: path.join(app.getAppPath(), '.env.local') });
@@ -450,7 +450,12 @@ async function scanDesktopFolder(dir: string): Promise<DetectedShortcut[]> {
     let iconFile: string | null = null;
     if (ext === '.lnk') {
       try {
-        targetPath = shell.readShortcutLink(fullPath).target || null;
+        const link = shell.readShortcutLink(fullPath);
+        targetPath = link.target || null;
+        // Squirrel-based installers (Teams, Slack, Discord, ...) often point the shortcut's
+        // target at an updater stub with no useful icon, while the shortcut's own icon field
+        // (set by the installer) points at the real app icon — so try that first.
+        iconFile = link.icon || null;
       } catch {
         targetPath = null;
       }
@@ -519,6 +524,167 @@ ipcMain.handle(
     return { error: result || null, tracked: false };
   },
 );
+
+async function getAppMeta(fullPath: string): Promise<{ name: string; icon: string | null }> {
+  const ext = path.extname(fullPath).toLowerCase();
+  const name = path.basename(fullPath, ext);
+
+  if (ext === '.lnk') {
+    let targetPath: string | null = null;
+    let shortcutIcon: string | null = null;
+    try {
+      const link = shell.readShortcutLink(fullPath);
+      targetPath = link.target || null;
+      shortcutIcon = link.icon || null;
+    } catch {
+      targetPath = null;
+    }
+    return { name, icon: await resolveIcon([shortcutIcon, targetPath, fullPath]) };
+  }
+
+  if (ext === '.url') {
+    const { iconFile, url } = parseUrlShortcut(fullPath);
+    return { name, icon: await resolveIcon([iconFile, url, fullPath]) };
+  }
+
+  return { name, icon: await resolveIcon([fullPath]) };
+}
+
+ipcMain.handle('apps:pick-app', async (): Promise<{ path: string; name: string; icon: string | null } | null> => {
+  const result = await dialog.showOpenDialog({
+    title: 'Choose an app, shortcut, or website link',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Apps & shortcuts', extensions: ['exe', 'lnk', 'url'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const fullPath = result.filePaths[0];
+  const meta = await getAppMeta(fullPath);
+  return { path: fullPath, name: meta.name, icon: meta.icon };
+});
+
+interface InstalledApp {
+  name: string;
+  path: string;
+  icon: string | null;
+}
+
+const SKIP_NAME_PATTERN = /uninstall|readme|license|helper|updater|^update$|setup|installer/i;
+
+async function scanShortcutsRecursive(dir: string, depth = 0): Promise<InstalledApp[]> {
+  if (depth > 3 || !fs.existsSync(dir)) return [];
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const found: InstalledApp[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...(await scanShortcutsRecursive(fullPath, depth + 1)));
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (ext !== '.lnk' && ext !== '.exe' && ext !== '.url') continue;
+    const name = path.basename(entry.name, ext);
+    if (SKIP_NAME_PATTERN.test(name)) continue;
+    const meta = await getAppMeta(fullPath);
+    found.push({ name: meta.name, path: fullPath, icon: meta.icon });
+  }
+  return found;
+}
+
+function runPowerShell(command: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      { maxBuffer: 10 * 1024 * 1024 },
+      (err, stdout) => (err ? reject(err) : resolve(stdout)),
+    );
+  });
+}
+
+/**
+ * Modern Slack/Teams/Store apps are packaged (MSIX) — they have no plain .lnk/.exe file to find at
+ * all, since Windows itself registers them rather than dropping a shortcut on disk. Get-StartApps
+ * is the same source the Start Menu's own search uses, so it finds these alongside classic apps.
+ * They're launched via a "shell:AppsFolder\<AppID>" URI rather than a real filesystem path.
+ */
+async function scanStartApps(): Promise<InstalledApp[]> {
+  try {
+    const stdout = await runPowerShell('Get-StartApps | ConvertTo-Json -Compress');
+    const parsed = JSON.parse(stdout);
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    return items
+      .filter((it): it is { Name: string; AppID: string } => !!it && typeof it.Name === 'string' && typeof it.AppID === 'string')
+      .map((it) => ({ name: it.Name, path: `shell:AppsFolder\\${it.AppID}`, icon: null }));
+  } catch {
+    return [];
+  }
+}
+
+ipcMain.handle('apps:scan-installed', async (): Promise<{ results: InstalledApp[]; error: string | null }> => {
+  try {
+    const dirs = [
+      path.join(os.homedir(), 'Desktop'),
+      'C:\\Users\\Public\\Desktop',
+      path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+      'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+    ];
+    const seen = new Set<string>();
+    const results: InstalledApp[] = [];
+    for (const dir of dirs) {
+      for (const item of await scanShortcutsRecursive(dir)) {
+        const key = item.name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(item);
+      }
+    }
+    for (const item of await scanStartApps()) {
+      const key = item.name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push(item);
+    }
+    results.sort((a, b) => a.name.localeCompare(b.name));
+    return { results, error: null };
+  } catch (err) {
+    return { results: [], error: err instanceof Error ? err.message : 'Could not scan installed apps.' };
+  }
+});
+
+ipcMain.handle('apps:launch-many', async (_event, { paths }: { paths: string[] }): Promise<{ errors: string[] }> => {
+  const errors: string[] = [];
+  for (const p of paths) {
+    try {
+      // Packaged (MSIX) apps like Store-installed Slack/Teams launch via a "shell:AppsFolder\..."
+      // URI, not a real filesystem path, so they skip the existsSync/openPath file-based flow.
+      // shell.openExternal mishandles this URI scheme (fails with "path not found") — spawning
+      // explorer.exe with it as an argument is the documented, reliable way to open it.
+      if (p.toLowerCase().startsWith('shell:')) {
+        spawn('explorer.exe', [p], { detached: true, stdio: 'ignore' }).unref();
+        continue;
+      }
+      if (!fs.existsSync(p)) {
+        errors.push(`${path.basename(p)}: file no longer exists at the saved path.`);
+        continue;
+      }
+      const result = await shell.openPath(p);
+      if (result) errors.push(`${path.basename(p)}: ${result}`);
+    } catch (err) {
+      errors.push(`${path.basename(p)}: ${err instanceof Error ? err.message : 'failed to launch.'}`);
+    }
+  }
+  return { errors };
+});
 
 function createWindow() {
   const win = new BrowserWindow({

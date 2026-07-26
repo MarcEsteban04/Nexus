@@ -4,6 +4,7 @@ import { useGamingStore } from '@/store/gamingStore';
 import { useReceiptStore } from '@/store/receiptStore';
 import { useShoppingStore } from '@/store/shoppingStore';
 import { useVaultStore } from '@/store/vaultStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 import { formatCurrency } from '@/utils/money';
 
 export interface SearchResult {
@@ -27,6 +28,7 @@ export function buildDataSearchIndex(): SearchResult[] {
   const receipts = useReceiptStore.getState();
   const shopping = useShoppingStore.getState();
   const vault = useVaultStore.getState();
+  const workspace = useWorkspaceStore.getState();
 
   for (const a of money.accounts) {
     results.push({ id: `account-${a.id}`, title: a.name, subtitle: `Account · ${formatCurrency(a.balance)}`, group: 'Money', path: '/money/accounts' });
@@ -84,6 +86,10 @@ export function buildDataSearchIndex(): SearchResult[] {
     }
   }
 
+  for (const w of workspace.workspaces) {
+    results.push({ id: `workspace-${w.id}`, title: w.name, subtitle: `Workspace · ${w.apps.length} app${w.apps.length === 1 ? '' : 's'}`, group: 'Workspace', path: '/workspace' });
+  }
+
   return results;
 }
 
@@ -104,5 +110,6 @@ export const STATIC_PAGES: SearchResult[] = [
   { id: 'page-ai', title: 'Nexus AI', subtitle: 'Page', group: 'Pages', path: '/ai' },
   { id: 'page-receipts', title: 'Receipt Vault', subtitle: 'Page', group: 'Pages', path: '/receipts' },
   { id: 'page-calendar', title: 'Calendar', subtitle: 'Page', group: 'Pages', path: '/calendar' },
+  { id: 'page-workspace', title: 'Workspace Manager', subtitle: 'Page', group: 'Pages', path: '/workspace' },
   { id: 'page-toolbox', title: 'Dev Toolbox', subtitle: 'Page', group: 'Pages', path: '/toolbox' },
 ];

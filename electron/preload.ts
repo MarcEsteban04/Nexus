@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('nexus', {
     return () => ipcRenderer.removeListener('games:session-ended', listener);
   },
   scanReceiptImage: (imageDataUrl: string) => ipcRenderer.invoke('receipts:scan', { imageDataUrl }),
+  pickApp: () => ipcRenderer.invoke('apps:pick-app'),
+  scanInstalledApps: () => ipcRenderer.invoke('apps:scan-installed'),
+  launchApps: (paths: string[]) => ipcRenderer.invoke('apps:launch-many', { paths }),
   askAssistantStream: (
     requestId: string,
     messages: { role: 'user' | 'assistant'; content: string }[],

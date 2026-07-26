@@ -168,3 +168,17 @@ export interface CalendarEvent {
   reminderMinutes: number | null;
   createdAt: string;
 }
+
+export interface WorkspaceApp {
+  id: string;
+  name: string;
+  path: string;
+  icon: string | null;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  apps: WorkspaceApp[];
+  createdAt: string;
+}

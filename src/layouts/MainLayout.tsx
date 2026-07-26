@@ -22,6 +22,7 @@ import {
   Sparkles,
   CalendarDays,
   Search,
+  AppWindow,
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import TitleBar from '@/components/TitleBar';
@@ -51,6 +52,7 @@ const NAV_ITEMS = [
   { to: '/ai', label: 'Nexus AI', icon: Sparkles },
   { to: '/receipts', label: 'Receipt Vault', icon: Receipt },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/workspace', label: 'Workspace Manager', icon: AppWindow },
   { to: '/toolbox', label: 'Dev Toolbox', icon: Wrench },
 ];
 
