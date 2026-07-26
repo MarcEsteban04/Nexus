@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface PayoneerState {
   marginPercent: number;
@@ -45,6 +46,7 @@ export const usePayoneerStore = create<PayoneerState>()(
     {
       name: 'nexus:payoneer',
       partialize: (state) => ({ marginPercent: state.marginPercent, midMarketRate: state.midMarketRate, updatedAt: state.updatedAt }),
+      storage: createJSONStorage(() => fileStorage),
     },
   ),
 );

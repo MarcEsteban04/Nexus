@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('nexus', {
     return () => ipcRenderer.removeListener('games:session-ended', listener);
   },
   scanReceiptImage: (imageDataUrl: string) => ipcRenderer.invoke('receipts:scan', { imageDataUrl }),
+  dbReadKey: (key: string) => ipcRenderer.invoke('store:read-key', { key }),
+  dbWriteKey: (key: string, value: string) => ipcRenderer.invoke('store:write-key', { key, value }),
+  dbDeleteKey: (key: string) => ipcRenderer.invoke('store:delete-key', { key }),
   pickApp: () => ipcRenderer.invoke('apps:pick-app'),
   scanInstalledApps: () => ipcRenderer.invoke('apps:scan-installed'),
   launchApps: (paths: string[]) => ipcRenderer.invoke('apps:launch-many', { paths }),

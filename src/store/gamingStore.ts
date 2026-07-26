@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Game } from '@/types';
 import { createId } from '@/utils/id';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface GamingState {
   games: Game[];
@@ -34,6 +35,6 @@ export const useGamingStore = create<GamingState>()(
         })),
       removeGame: (id) => set((state) => ({ games: state.games.filter((g) => g.id !== id) })),
     }),
-    { name: 'nexus:gaming' },
+    { name: 'nexus:gaming', storage: createJSONStorage(() => fileStorage) },
   ),
 );

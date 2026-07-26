@@ -3,11 +3,76 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { spawn, execFile, ChildProcess } from 'child_process';
+import { DatabaseSync } from 'node:sqlite';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: path.join(app.getAppPath(), '.env.local') });
 
 const isDev = !app.isPackaged;
+
+// All app data (money, calendar, vault, etc.) is persisted here instead of the renderer's
+// localStorage — Chromium's localStorage backend (leveldb) can silently corrupt/reset itself if
+// the process is ever killed forcefully (a crash, a forced task-kill, a power loss) instead of
+// closing cleanly. SQLite in WAL mode is built for exactly this: durable, crash-safe writes.
+// Each zustand store's persisted state lives in its own row (key = store name), keyed the same
+// way it was under the previous localStorage/JSON-file approach.
+let db: DatabaseSync | null = null;
+
+function getDb(): DatabaseSync {
+  if (db) return db;
+
+  const userDataDir = app.getPath('userData');
+  db = new DatabaseSync(path.join(userDataDir, 'nexus.db'));
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
+
+  const countRow = db.prepare('SELECT COUNT(*) as c FROM kv_store').get() as { c: number };
+  if (countRow.c === 0) {
+    // One-time migration from the previous JSON-file-based storage, so upgrading doesn't strand
+    // whatever was already saved there.
+    const legacyFile = path.join(userDataDir, 'nexus-data.json');
+    try {
+      if (fs.existsSync(legacyFile)) {
+        const parsed = JSON.parse(fs.readFileSync(legacyFile, 'utf-8')) as Record<string, string>;
+        const insert = db.prepare(
+          'INSERT INTO kv_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        );
+        for (const [key, value] of Object.entries(parsed)) insert.run(key, value);
+        fs.renameSync(legacyFile, `${legacyFile}.migrated`);
+      }
+    } catch {
+      // Best-effort migration — if it fails for any reason, continue with an empty database
+      // rather than blocking startup.
+    }
+  }
+
+  return db;
+}
+
+ipcMain.handle('store:read-key', (_event, { key }: { key: string }): string | null => {
+  const row = getDb().prepare('SELECT value FROM kv_store WHERE key = ?').get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+});
+
+ipcMain.handle('store:write-key', (_event, { key, value }: { key: string; value: string }): { error: string | null } => {
+  try {
+    getDb()
+      .prepare('INSERT INTO kv_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(key, value);
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not save data.' };
+  }
+});
+
+ipcMain.handle('store:delete-key', (_event, { key }: { key: string }): { error: string | null } => {
+  try {
+    getDb().prepare('DELETE FROM kv_store WHERE key = ?').run(key);
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not delete data.' };
+  }
+});
 
 interface PriceSearchResult {
   title: string;

@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { PasswordEntry } from '@/types';
 import { createId } from '@/utils/id';
 import { decryptText, deriveKey, encryptText, generateSaltB64 } from '@/utils/vaultCrypto';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface VaultState {
   salt: string | null;
@@ -122,6 +123,7 @@ export const useVaultStore = create<VaultState>()(
     {
       name: 'nexus:vault',
       partialize: (state) => ({ salt: state.salt, iv: state.iv, cipher: state.cipher }),
+      storage: createJSONStorage(() => fileStorage),
     },
   ),
 );

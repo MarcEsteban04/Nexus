@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { fileStorage } from '@/utils/fileStorage';
 
 export const CURRENCIES = ['PHP', 'USD', 'EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'SGD', 'KRW', 'CNY'] as const;
 export type Currency = (typeof CURRENCIES)[number];
@@ -50,6 +51,10 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
         }
       },
     }),
-    { name: 'nexus:exchange-rate', partialize: (state) => ({ base: state.base, quote: state.quote, rate: state.rate, updatedAt: state.updatedAt, isManual: state.isManual }) },
+    {
+      name: 'nexus:exchange-rate',
+      partialize: (state) => ({ base: state.base, quote: state.quote, rate: state.rate, updatedAt: state.updatedAt, isManual: state.isManual }),
+      storage: createJSONStorage(() => fileStorage),
+    },
   ),
 );

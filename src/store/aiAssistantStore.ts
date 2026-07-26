@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { createId } from '@/utils/id';
 import { ContextDomain } from '@/utils/assistantContext';
+import { fileStorage } from '@/utils/fileStorage';
 
 export interface AssistantMessage {
   id: string;
@@ -43,6 +44,6 @@ export const useAiAssistantStore = create<AiAssistantState>()(
         set((state) => ({ enabledDomains: { ...state.enabledDomains, [domain]: !state.enabledDomains[domain] } })),
       setLastDigestDate: (date) => set({ lastDigestDate: date }),
     }),
-    { name: 'nexus:ai-assistant' },
+    { name: 'nexus:ai-assistant', storage: createJSONStorage(() => fileStorage) },
   ),
 );

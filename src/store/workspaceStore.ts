@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Workspace, WorkspaceApp } from '@/types';
 import { createId } from '@/utils/id';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -43,6 +44,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ),
         })),
     }),
-    { name: 'nexus:workspaces' },
+    { name: 'nexus:workspaces', storage: createJSONStorage(() => fileStorage) },
   ),
 );

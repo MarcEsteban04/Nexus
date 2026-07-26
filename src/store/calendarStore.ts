@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { CalendarEvent } from '@/types';
 import { createId } from '@/utils/id';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface CalendarState {
   events: CalendarEvent[];
@@ -20,6 +21,6 @@ export const useCalendarStore = create<CalendarState>()(
         set((state) => ({ events: state.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
       removeEvent: (id) => set((state) => ({ events: state.events.filter((e) => e.id !== id) })),
     }),
-    { name: 'nexus:calendar' },
+    { name: 'nexus:calendar', storage: createJSONStorage(() => fileStorage) },
   ),
 );

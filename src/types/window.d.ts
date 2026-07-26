@@ -21,6 +21,9 @@ declare global {
       ) => Promise<{ error: string | null; tracked: boolean }>;
       onGameSessionEnded: (cb: (payload: { gameId: string; hours: number }) => void) => () => void;
       scanReceiptImage: (imageDataUrl: string) => Promise<{ result: ScannedReceipt | null; error: string | null }>;
+      dbReadKey: (key: string) => Promise<string | null>;
+      dbWriteKey: (key: string, value: string) => Promise<{ error: string | null }>;
+      dbDeleteKey: (key: string) => Promise<{ error: string | null }>;
       pickApp: () => Promise<{ path: string; name: string; icon: string | null } | null>;
       scanInstalledApps: () => Promise<{ results: { name: string; path: string; icon: string | null }[]; error: string | null }>;
       launchApps: (paths: string[]) => Promise<{ errors: string[] }>;

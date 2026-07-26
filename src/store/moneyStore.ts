@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Account, Bill, Debt, RecurringIncome, SavingsGoal, Subscription, Transaction } from '@/types';
 import { createId } from '@/utils/id';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface MoneyState {
   transactions: Transaction[];
@@ -150,6 +151,6 @@ export const useMoneyStore = create<MoneyState>()(
         })),
       removeAccount: (id) => set((state) => ({ accounts: state.accounts.filter((a) => a.id !== id) })),
     }),
-    { name: 'nexus:money' },
+    { name: 'nexus:money', storage: createJSONStorage(() => fileStorage) },
   ),
 );

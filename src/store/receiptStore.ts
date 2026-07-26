@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Receipt } from '@/types';
 import { createId } from '@/utils/id';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface ReceiptState {
   receipts: Receipt[];
@@ -25,6 +26,6 @@ export const useReceiptStore = create<ReceiptState>()(
           receipts: state.receipts.map((r) => (r.id === receiptId ? { ...r, transactionId } : r)),
         })),
     }),
-    { name: 'nexus:receipts' },
+    { name: 'nexus:receipts', storage: createJSONStorage(() => fileStorage) },
   ),
 );

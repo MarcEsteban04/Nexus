@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { WishlistItem } from '@/types';
 import { createId } from '@/utils/id';
+import { fileStorage } from '@/utils/fileStorage';
 
 interface ShoppingState {
   items: WishlistItem[];
@@ -27,6 +28,6 @@ export const useShoppingStore = create<ShoppingState>()(
         })),
       removeItem: (id) => set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
     }),
-    { name: 'nexus:shopping' },
+    { name: 'nexus:shopping', storage: createJSONStorage(() => fileStorage) },
   ),
 );
