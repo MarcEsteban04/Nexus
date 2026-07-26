@@ -6,6 +6,8 @@ import { ContextDomain } from '@/utils/assistantContext';
 export interface AssistantMessage {
   id: string;
   role: 'user' | 'assistant';
+  /** 'action-result' messages are app-generated (from executeToolCall), never written by the model itself. */
+  kind: 'text' | 'action-result';
   content: string;
   createdAt: string;
 }
@@ -17,7 +19,7 @@ interface AiAssistantState {
   provider: AssistantProvider;
   enabledDomains: Record<ContextDomain, boolean>;
   lastDigestDate: string | null;
-  addMessage: (role: 'user' | 'assistant', content: string) => void;
+  addMessage: (role: 'user' | 'assistant', content: string, kind?: 'text' | 'action-result') => void;
   clearMessages: () => void;
   setProvider: (provider: AssistantProvider) => void;
   toggleDomain: (domain: ContextDomain) => void;
@@ -31,9 +33,9 @@ export const useAiAssistantStore = create<AiAssistantState>()(
       provider: 'openai',
       enabledDomains: { money: true, calendar: true, gaming: true, receipts: true, shopping: true },
       lastDigestDate: null,
-      addMessage: (role, content) =>
+      addMessage: (role, content, kind = 'text') =>
         set((state) => ({
-          messages: [...state.messages, { id: createId(), role, content, createdAt: new Date().toISOString() }],
+          messages: [...state.messages, { id: createId(), role, content, kind, createdAt: new Date().toISOString() }],
         })),
       clearMessages: () => set({ messages: [] }),
       setProvider: (provider) => set({ provider }),
