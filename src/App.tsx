@@ -19,6 +19,7 @@ import AIWorkspace from '@/pages/AIWorkspace/AIWorkspace';
 import Receipts from '@/pages/Receipts/Receipts';
 import Calendar from '@/pages/Calendar/Calendar';
 import Workspace from '@/pages/Workspace/Workspace';
+import Settings from '@/pages/Settings/Settings';
 import { useEventReminders } from '@/hooks/useEventReminders';
 import { useDailyReminders } from '@/hooks/useDailyReminders';
 
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/workspace" element={<Workspace />} />
         <Route path="/toolbox" element={<Toolbox />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );

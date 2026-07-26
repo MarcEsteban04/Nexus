@@ -112,4 +112,5 @@ export const STATIC_PAGES: SearchResult[] = [
   { id: 'page-calendar', title: 'Calendar', subtitle: 'Page', group: 'Pages', path: '/calendar' },
   { id: 'page-workspace', title: 'Workspace Manager', subtitle: 'Page', group: 'Pages', path: '/workspace' },
   { id: 'page-toolbox', title: 'Dev Toolbox', subtitle: 'Page', group: 'Pages', path: '/toolbox' },
+  { id: 'page-settings', title: 'Settings', subtitle: 'Page', group: 'Pages', path: '/settings' },
 ];

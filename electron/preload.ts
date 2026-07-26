@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('nexus', {
   dbReadKey: (key: string) => ipcRenderer.invoke('store:read-key', { key }),
   dbWriteKey: (key: string, value: string) => ipcRenderer.invoke('store:write-key', { key, value }),
   dbDeleteKey: (key: string) => ipcRenderer.invoke('store:delete-key', { key }),
+  getApiKeyStatus: () => ipcRenderer.invoke('settings:get-key-status'),
+  setApiKey: (name: 'OPENAI_API_KEY' | 'GROK_API_KEY', value: string) =>
+    ipcRenderer.invoke('settings:set-key', { name, value }),
+  clearApiKey: (name: 'OPENAI_API_KEY' | 'GROK_API_KEY') => ipcRenderer.invoke('settings:clear-key', { name }),
   pickApp: () => ipcRenderer.invoke('apps:pick-app'),
   scanInstalledApps: () => ipcRenderer.invoke('apps:scan-installed'),
   launchApps: (paths: string[]) => ipcRenderer.invoke('apps:launch-many', { paths }),

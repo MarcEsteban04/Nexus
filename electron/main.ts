@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, nativeImage, dialog } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, nativeImage, dialog, safeStorage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -74,6 +74,71 @@ ipcMain.handle('store:delete-key', (_event, { key }: { key: string }): { error: 
   }
 });
 
+// API keys a user enters themselves (Settings page) are encrypted with the OS's own credential
+// store (DPAPI on Windows, Keychain on macOS, libsecret on Linux) via safeStorage, so a distributed
+// build never needs the developer's own .env.local — each user supplies and stores their own key,
+// encrypted at rest and readable only by their own OS user account on this machine.
+type ApiKeyName = 'OPENAI_API_KEY' | 'GROK_API_KEY';
+
+function secretDbKey(name: ApiKeyName): string {
+  return `nexus:secret:${name}`;
+}
+
+function getStoredApiKey(name: ApiKeyName): string | null {
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  const row = getDb().prepare('SELECT value FROM kv_store WHERE key = ?').get(secretDbKey(name)) as
+    | { value: string }
+    | undefined;
+  if (!row) return null;
+  try {
+    return safeStorage.decryptString(Buffer.from(row.value, 'base64'));
+  } catch {
+    return null;
+  }
+}
+
+function setStoredApiKey(name: ApiKeyName, value: string): void {
+  const encrypted = safeStorage.encryptString(value).toString('base64');
+  getDb()
+    .prepare('INSERT INTO kv_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(secretDbKey(name), encrypted);
+}
+
+function clearStoredApiKey(name: ApiKeyName): void {
+  getDb().prepare('DELETE FROM kv_store WHERE key = ?').run(secretDbKey(name));
+}
+
+/** A key set via the Settings page always wins; process.env (.env.local) is only a dev-time fallback. */
+function resolveApiKey(name: ApiKeyName): string | null {
+  return getStoredApiKey(name) ?? process.env[name] ?? null;
+}
+
+ipcMain.handle('settings:get-key-status', (): Record<ApiKeyName, boolean> => ({
+  OPENAI_API_KEY: getStoredApiKey('OPENAI_API_KEY') != null || !!process.env.OPENAI_API_KEY,
+  GROK_API_KEY: getStoredApiKey('GROK_API_KEY') != null || !!process.env.GROK_API_KEY,
+}));
+
+ipcMain.handle('settings:set-key', (_event, { name, value }: { name: ApiKeyName; value: string }): { error: string | null } => {
+  if (!safeStorage.isEncryptionAvailable()) {
+    return { error: 'Secure storage is not available on this system.' };
+  }
+  try {
+    setStoredApiKey(name, value);
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not save the key.' };
+  }
+});
+
+ipcMain.handle('settings:clear-key', (_event, { name }: { name: ApiKeyName }): { error: string | null } => {
+  try {
+    clearStoredApiKey(name);
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not clear the key.' };
+  }
+});
+
 interface PriceSearchResult {
   title: string;
   link: string;
@@ -111,8 +176,8 @@ function extractJsonArray(text: string): any[] {
 ipcMain.handle(
   'shopping:search-prices',
   async (_event, { query }: { query: string }): Promise<{ results: PriceSearchResult[]; error: string | null }> => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { results: [], error: 'No OPENAI_API_KEY found in .env.local.' };
+    const apiKey = resolveApiKey('OPENAI_API_KEY');
+    if (!apiKey) return { results: [], error: 'No OpenAI API key set. Add one in Settings.' };
     if (!query.trim()) return { results: [], error: 'Enter a product to search for.' };
 
     try {
@@ -183,8 +248,8 @@ interface ExtractedCredential {
 ipcMain.handle(
   'vault:parse-import',
   async (_event, { text }: { text: string }): Promise<{ results: ExtractedCredential[]; error: string | null }> => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { results: [], error: 'No OPENAI_API_KEY found in .env.local.' };
+    const apiKey = resolveApiKey('OPENAI_API_KEY');
+    if (!apiKey) return { results: [], error: 'No OpenAI API key set. Add one in Settings.' };
     if (!text.trim()) return { results: [], error: 'Paste or select a file with your credentials first.' };
 
     try {
@@ -259,8 +324,8 @@ interface ScannedReceipt {
 ipcMain.handle(
   'receipts:scan',
   async (_event, { imageDataUrl }: { imageDataUrl: string }): Promise<{ result: ScannedReceipt | null; error: string | null }> => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { result: null, error: 'No OPENAI_API_KEY found in .env.local.' };
+    const apiKey = resolveApiKey('OPENAI_API_KEY');
+    if (!apiKey) return { result: null, error: 'No OpenAI API key set. Add one in Settings.' };
     if (!imageDataUrl) return { result: null, error: 'No receipt photo provided.' };
 
     try {
@@ -325,7 +390,7 @@ type AssistantProvider = 'openai' | 'groq';
 
 const ASSISTANT_PROVIDERS: Record<
   AssistantProvider,
-  { envKey: string; endpoint: string; model: string; label: string }
+  { envKey: ApiKeyName; endpoint: string; model: string; label: string }
 > = {
   openai: {
     envKey: 'OPENAI_API_KEY',
@@ -366,8 +431,8 @@ ipcMain.on('assistant:ask-stream', async (event, { requestId, messages, context,
   };
 
   const config = ASSISTANT_PROVIDERS[provider] ?? ASSISTANT_PROVIDERS.openai;
-  const apiKey = process.env[config.envKey];
-  if (!apiKey) return finish({ content: '', toolCalls: null, error: `No ${config.envKey} found in .env.local.` });
+  const apiKey = resolveApiKey(config.envKey);
+  if (!apiKey) return finish({ content: '', toolCalls: null, error: `No ${config.label} API key set. Add one in Settings.` });
   if (!messages.length) return finish({ content: '', toolCalls: null, error: 'Ask something first.' });
 
   try {

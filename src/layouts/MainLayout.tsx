@@ -26,6 +26,7 @@ import {
   AppWindow,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import TitleBar from '@/components/TitleBar';
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/workspace', label: 'Workspace Manager', icon: AppWindow },
   { to: '/toolbox', label: 'Dev Toolbox', icon: Wrench },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 const COLLAPSE_KEY = 'nexus:sidebar-collapsed';
