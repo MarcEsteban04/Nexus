@@ -16,7 +16,7 @@ export default function TitleBar() {
           <Sparkles size={12} className="text-white" strokeWidth={2.5} />
         </div>
         <span className="text-[13px] font-semibold tracking-tight text-surface-100">Nexus</span>
-        <span className="text-[11px] text-surface-500">v0.1.0</span>
+        <span className="text-[11px] text-surface-500">v0.3.0</span>
       </div>
 
       <div className="app-no-drag flex h-full">

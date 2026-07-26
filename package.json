@@ -1,6 +1,6 @@
 {
   "name": "nexus",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Nexus - Your Digital Life, Unified.",
   "main": "dist-electron/main.js",
   "private": true,

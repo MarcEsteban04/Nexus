@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,9 +21,11 @@ import {
   Gamepad2,
   Sparkles,
   CalendarDays,
+  Search,
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import TitleBar from '@/components/TitleBar';
+import CommandPalette from '@/components/CommandPalette';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -58,13 +60,35 @@ export default function MainLayout() {
   const [expanded, setExpanded] = useState<string | null>(
     NAV_ITEMS.find((item) => item.children && location.pathname.startsWith(item.to))?.to ?? null,
   );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-950 text-surface-100">
       <TitleBar />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-60 shrink-0 flex-col border-r border-surface-800 bg-surface-900">
-          <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          <div className="px-3 pt-4">
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="mb-2 flex w-full items-center gap-2.5 rounded-xl border border-surface-800 bg-surface-850 px-3 py-2 text-[13px] text-surface-400 transition-colors hover:border-surface-700 hover:text-surface-200"
+            >
+              <Search size={15} />
+              <span className="flex-1 text-left">Search</span>
+              <kbd className="rounded border border-surface-700 px-1.5 py-0.5 text-[10px] text-surface-500">Ctrl K</kbd>
+            </button>
+          </div>
+          <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-1">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isParentActive = location.pathname.startsWith(item.to);
@@ -178,6 +202,7 @@ export default function MainLayout() {
           </AnimatePresence>
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }

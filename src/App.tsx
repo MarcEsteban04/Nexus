@@ -19,9 +19,11 @@ import AIWorkspace from '@/pages/AIWorkspace/AIWorkspace';
 import Receipts from '@/pages/Receipts/Receipts';
 import Calendar from '@/pages/Calendar/Calendar';
 import { useEventReminders } from '@/hooks/useEventReminders';
+import { useDailyReminders } from '@/hooks/useDailyReminders';
 
 export default function App() {
   useEventReminders();
+  useDailyReminders();
   return (
     <Routes>
       <Route element={<MainLayout />}>
