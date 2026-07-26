@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, nativeImage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -332,8 +332,25 @@ function resolveSpawnPath(ext: string, fullPath: string, targetPath: string | nu
 }
 
 async function resolveIcon(candidatePaths: (string | null)[]): Promise<string | null> {
-  for (const candidate of candidatePaths) {
-    if (!candidate || !fs.existsSync(candidate)) continue;
+  for (const rawCandidate of candidatePaths) {
+    if (!rawCandidate) continue;
+    // Strip a trailing ",<index>" icon-index suffix some .url IconFile values include.
+    const candidate = rawCandidate.replace(/,-?\d+$/, '');
+    if (!fs.existsSync(candidate)) continue;
+
+    // .ico files hold the icon's actual image data — app.getFileIcon extracts the shell
+    // icon associated with a file's *type* instead, which for .ico is a generic image
+    // icon, not the icon's own pixels. nativeImage decodes it directly.
+    if (path.extname(candidate).toLowerCase() === '.ico') {
+      try {
+        const image = nativeImage.createFromPath(candidate);
+        if (!image.isEmpty()) return image.toDataURL();
+      } catch {
+        // try next candidate
+      }
+      continue;
+    }
+
     try {
       const image = await app.getFileIcon(candidate, { size: 'normal' });
       if (!image.isEmpty()) return image.toDataURL();
